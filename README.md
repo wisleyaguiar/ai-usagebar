@@ -194,17 +194,20 @@ If you'd rather see them all at once:
 
 ## Hyprland: float the TUI window
 
-By default Hyprland tiles the TUI. To make `ai-usagebar-tui` open as a centered floating window, add this to `~/.config/hypr/hyprland.conf` (or any sourced `.conf`, e.g. `looknfeel.conf` if you have one):
+By default Hyprland tiles the TUI. To make `ai-usagebar-tui` open as a centered floating window — the same way Omarchy floats its own settings TUIs (Wi-Fi/`impala`, audio/`wiremix`, Bluetooth/`bluetui`) — add this to `~/.config/hypr/hyprland.conf` (or any sourced `.conf`, e.g. `looknfeel.conf`):
 
 ```ini
-# ai-usagebar TUI — float instead of tiling. omarchy-launch-tui sets the
+# ai-usagebar TUI — float + center + fixed size. omarchy-launch-tui sets the
 # app-id from the binary basename, so the class is org.omarchy.ai-usagebar-tui.
+# 875x600 matches the size Omarchy gives its own `floating-window`-tagged TUIs.
 windowrule = float on, match:class ^(org\.omarchy\.ai-usagebar-tui)$
-windowrule = size 80% 70%, match:class ^(org\.omarchy\.ai-usagebar-tui)$
 windowrule = center on, match:class ^(org\.omarchy\.ai-usagebar-tui)$
+windowrule = size 875 600, match:class ^(org\.omarchy\.ai-usagebar-tui)$
 ```
 
-Then `hyprctl reload` (no logout needed). If you launch the TUI differently (e.g. `kitty -e ai-usagebar-tui`) replace the class regex with whatever `hyprctl clients` reports for your terminal.
+Then `hyprctl reload` (no logout needed).
+
+> Omarchy itself tags a hardcoded list of TUI app-ids with `floating-window` in `~/.local/share/omarchy/default/hypr/apps/system.conf` (which then applies `float + center + size 875 600`). We set the three rules directly instead of relying on that tag, so the size is deterministic regardless of which config is sourced first. If you launch the TUI differently (e.g. `kitty -e ai-usagebar-tui`) replace the class regex with whatever `hyprctl clients` reports for your terminal.
 
 > Hyprland 0.46+ uses the unified `windowrule` keyword with `match:…` filters. The older `windowrulev2 = …, class:…` syntax still works on legacy Hyprland but is deprecated — use the form above on current Omarchy / Hyprland releases.
 
