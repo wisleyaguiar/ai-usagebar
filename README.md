@@ -115,6 +115,22 @@ ai-usagebar --vendor openrouter --watch 5
 ai-usagebar-tui
 ```
 
+## Standalone TUI — no Waybar required
+
+The two binaries are independent. If you don't run Waybar (or just want to check usage occasionally rather than have it on your bar permanently), `ai-usagebar-tui` works as a fully standalone terminal app:
+
+```bash
+ai-usagebar-tui                    # opens in your current terminal
+```
+
+It runs in any terminal emulator (Kitty, Alacritty, Foot, Ghostty, etc.), works in plain SSH sessions, and doesn't need a compositor or any window manager features. All controls and the Settings overlay work the same way. Use it as:
+
+- An ad-hoc check ("am I close to my Claude weekly limit before I start a long session?")
+- A foreground monitor on a secondary screen / tmux pane while you code
+- A shell-only tool on remote machines (just install the binary; no Waybar/Hyprland dependencies)
+
+The Waybar widget is purely an *optional* always-on-screen surface. The TUI is the canonical way to see all four vendors at once, regardless of whether you ever set up the widget.
+
 ## Waybar config
 
 ### Single module, scroll-to-cycle (recommended)
