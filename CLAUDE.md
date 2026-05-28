@@ -50,6 +50,14 @@ When cutting a new version (patch, minor, or major):
     - `~/Projects/aur-ai-usagebar` → `ssh://aur@aur.archlinux.org/ai-usagebar.git`
     - `~/Projects/aur-ai-usagebar-bin` → `ssh://aur@aur.archlinux.org/ai-usagebar-bin.git`
 
+    **Always `git fetch origin && git reset --hard origin/master` in each
+    AUR clone first.** A previous session may have pushed an intermediate
+    release that your local clone never saw — in which case naively
+    committing on top diverges and produces a non-trivial rebase
+    conflict. The clones are throwaway: reset, then overlay the canonical
+    `packaging/aur/PKGBUILD*` + regen'd `.SRCINFO*` from the main repo,
+    commit, push.
+
 **Anything skipping any of 1–10 is an incomplete release.** Tags are
 immutable; do **not** force-move a tag once it's pushed. Cut a new
 patch version instead.
