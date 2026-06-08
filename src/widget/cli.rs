@@ -166,10 +166,10 @@ impl Cli {
         if let Some(v) = self.vendor {
             return v;
         }
-        if let Some(id) = active {
-            if config.is_enabled(id) {
-                return id_to_vendor(id);
-            }
+        if let Some(id) = active
+            && config.is_enabled(id)
+        {
+            return id_to_vendor(id);
         }
         match config.ui.primary {
             Some(id) => id_to_vendor(id),

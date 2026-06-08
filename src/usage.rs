@@ -202,10 +202,10 @@ pub fn anthropic_severity(snap: &AnthropicSnapshot) -> crate::pacing::PaceSeveri
     if snap.weekly.utilization_pct > max {
         max = snap.weekly.utilization_pct;
     }
-    if let Some(s) = &snap.sonnet {
-        if s.utilization_pct > max {
-            max = s.utilization_pct;
-        }
+    if let Some(s) = &snap.sonnet
+        && s.utilization_pct > max
+    {
+        max = s.utilization_pct;
     }
     // Extra usage only promotes severity if a rate-limit window is at 100%.
     let any_at_cap = snap.session.utilization_pct >= 100
@@ -214,12 +214,10 @@ pub fn anthropic_severity(snap: &AnthropicSnapshot) -> crate::pacing::PaceSeveri
             .sonnet
             .as_ref()
             .is_some_and(|s| s.utilization_pct >= 100);
-    if any_at_cap {
-        if let Some(extra) = snap.extra {
-            let p = extra.percent();
-            if p > max {
-                max = p;
-            }
+    if any_at_cap && let Some(extra) = snap.extra {
+        let p = extra.percent();
+        if p > max {
+            max = p;
         }
     }
     crate::pango::severity_for(max)

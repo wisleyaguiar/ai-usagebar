@@ -10,14 +10,16 @@ use std::path::{Path, PathBuf};
 
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
+use ratatui_bubbletea_theme::BubbleTheme;
 use toml_edit::{DocumentMut, value};
 
 use crate::config::Config;
 use crate::error::{AppError, Result};
 use crate::theme::Theme;
+use crate::tui::style::bubble_theme;
 use crate::vendor::VendorId;
 
 /// Which input field has keyboard focus.
@@ -369,14 +371,14 @@ fn set_string(doc: &mut DocumentMut, section: &str, key: &str, new_value: &str) 
         .as_table_mut()
         .ok_or_else(|| AppError::Other(format!("config.toml: [{section}] is not a table")))?;
 
-    if let Some(item) = table.get_mut(key) {
-        if let Some(v) = item.as_value_mut() {
-            *v = toml_edit::Value::from(new_value);
-            // Restore the surrounding decor (a space before `=` and after the
-            // value, matching toml_edit's default output).
-            v.decor_mut().set_prefix(" ");
-            return Ok(());
-        }
+    if let Some(item) = table.get_mut(key)
+        && let Some(v) = item.as_value_mut()
+    {
+        *v = toml_edit::Value::from(new_value);
+        // Restore the surrounding decor (a space before `=` and after the
+        // value, matching toml_edit's default output).
+        v.decor_mut().set_prefix(" ");
+        return Ok(());
     }
     table.insert(key, value(new_value));
     Ok(())
@@ -393,14 +395,9 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
     // Clear underneath so the body is unreadable through us.
     f.render_widget(Clear, modal);
 
-    let accent = parse_hex(&theme.blue).unwrap_or(Color::Cyan);
-    let fg = parse_hex(&theme.fg).unwrap_or(Color::White);
-    let dim = parse_hex(&theme.dim).unwrap_or(Color::DarkGray);
+    let bubble = bubble_theme(theme);
 
-    let block = Block::default()
-        .title(" Settings ")
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
+    let block = bubble.titled_modal_block(" Settings ");
     let inner = block.inner(modal);
     f.render_widget(block, modal);
 
@@ -428,13 +425,12 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
         Paragraph::new(label(
             "Primary vendor",
             state.focus == Focus::Primary,
-            fg,
-            accent,
+            &bubble,
         )),
         chunks[0],
     );
     f.render_widget(
-        Paragraph::new(render_radio(&state.primary, accent, dim)),
+        Paragraph::new(render_radio(&state.primary, &bubble)),
         chunks[1],
     );
 
@@ -443,8 +439,7 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
         Paragraph::new(label(
             "Z.AI API key (ZAI_API_KEY env wins if set)",
             state.focus == Focus::ZaiKey,
-            fg,
-            accent,
+            &bubble,
         )),
         chunks[3],
     );
@@ -452,9 +447,7 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
         Paragraph::new(render_input(
             &state.zai,
             state.focus == Focus::ZaiKey,
-            fg,
-            accent,
-            dim,
+            &bubble,
         )),
         chunks[4],
     );
@@ -464,8 +457,7 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
         Paragraph::new(label(
             "OpenRouter API key (OPENROUTER_API_KEY env wins if set)",
             state.focus == Focus::OpenrouterKey,
-            fg,
-            accent,
+            &bubble,
         )),
         chunks[5],
     );
@@ -473,9 +465,7 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
         Paragraph::new(render_input(
             &state.openrouter,
             state.focus == Focus::OpenrouterKey,
-            fg,
-            accent,
-            dim,
+            &bubble,
         )),
         chunks[6],
     );
@@ -485,8 +475,7 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
         Paragraph::new(label(
             "DeepSeek API key (DEEPSEEK_API_KEY env wins if set)",
             state.focus == Focus::DeepseekKey,
-            fg,
-            accent,
+            &bubble,
         )),
         chunks[7],
     );
@@ -494,20 +483,16 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
         Paragraph::new(render_input(
             &state.deepseek,
             state.focus == Focus::DeepseekKey,
-            fg,
-            accent,
-            dim,
+            &bubble,
         )),
         chunks[8],
     );
 
     // Save button.
     let save_style = if state.focus == Focus::SaveButton {
-        Style::default()
-            .fg(accent)
-            .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        bubble.selected.add_modifier(Modifier::REVERSED)
     } else {
-        Style::default().fg(accent)
+        bubble.accent.add_modifier(Modifier::BOLD)
     };
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(
@@ -520,40 +505,48 @@ pub fn render(f: &mut Frame, area: Rect, state: &SettingsState, theme: &Theme) {
     // Status line.
     if !state.status.is_empty() {
         f.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                state.status.clone(),
-                Style::default().fg(dim),
-            ))),
+            Paragraph::new(Line::from(Span::styled(state.status.clone(), bubble.muted))),
             chunks[11],
         );
     }
 
     // Hint footer.
-    let hint = Line::from(vec![Span::styled(
-        "  Tab/↑↓ move · ←→ pick vendor · Ctrl-V reveal · Ctrl-S save · Esc cancel",
-        Style::default().fg(dim),
-    )]);
+    let hint = bubble.help_line([
+        ("tab/up/down", "move"),
+        ("left/right", "pick"),
+        ("ctrl+v", "reveal"),
+        ("ctrl+s", "save"),
+        ("esc", "cancel"),
+    ]);
     f.render_widget(Paragraph::new(hint), chunks[12]);
 }
 
-fn label(text: &str, focused: bool, fg: Color, accent: Color) -> Line<'static> {
-    let mut style = Style::default().fg(fg);
-    if focused {
-        style = style.fg(accent).add_modifier(Modifier::BOLD);
-    }
-    Line::from(Span::styled(format!("  {text}"), style))
+fn label(text: &str, focused: bool, theme: &BubbleTheme) -> Line<'static> {
+    let marker = if focused {
+        theme.symbols.selected
+    } else {
+        theme.symbols.bullet
+    };
+    let marker_style = if focused { theme.accent } else { theme.muted };
+    let text_style = if focused { theme.title } else { theme.text };
+    Line::from(vec![
+        theme.muted("  "),
+        Span::styled(marker, marker_style),
+        theme.span(" "),
+        Span::styled(text.to_string(), text_style),
+    ])
 }
 
-fn render_radio(selected: &VendorId, accent: Color, dim: Color) -> Line<'static> {
-    let mut spans = vec![Span::raw("    ")];
+fn render_radio(selected: &VendorId, theme: &BubbleTheme) -> Line<'static> {
+    let mut spans = vec![theme.muted("    ")];
     for v in VendorId::all() {
         let is_sel = v == selected;
-        let glyph = if is_sel { "●" } else { "○" };
-        let style = if is_sel {
-            Style::default().fg(accent).add_modifier(Modifier::BOLD)
+        let glyph = if is_sel {
+            theme.symbols.selected
         } else {
-            Style::default().fg(dim)
+            theme.symbols.bullet
         };
+        let style = if is_sel { theme.selected } else { theme.muted };
         spans.push(Span::styled(
             format!("{glyph} {}  ", vendor_label(*v)),
             style,
@@ -572,24 +565,18 @@ fn vendor_label(v: VendorId) -> &'static str {
     }
 }
 
-fn render_input(
-    input: &KeyInput,
-    focused: bool,
-    fg: Color,
-    accent: Color,
-    dim: Color,
-) -> Line<'static> {
+fn render_input(input: &KeyInput, focused: bool, theme: &BubbleTheme) -> Line<'static> {
     let body = if input.buf.is_empty() {
         "(empty)".to_string()
     } else {
         input.display()
     };
     let box_style = if focused {
-        Style::default().fg(accent).add_modifier(Modifier::BOLD)
+        theme.accent.add_modifier(Modifier::BOLD)
     } else {
-        Style::default().fg(fg)
+        theme.text
     };
-    let suffix_style = Style::default().fg(dim);
+    let suffix_style = theme.muted;
     let suffix = if input.revealed { "  [revealed]" } else { "" };
     let cursor_hint = if focused {
         format!("  ▏cur:{}", input.cursor)
@@ -597,14 +584,10 @@ fn render_input(
         String::new()
     };
     Line::from(vec![
-        Span::styled(format!("    {body}"), box_style),
+        theme.muted("    "),
+        Span::styled(body, box_style),
         Span::styled(format!("{suffix}{cursor_hint}"), suffix_style),
     ])
-}
-
-fn parse_hex(s: &str) -> Option<Color> {
-    let (r, g, b) = crate::theme::parse_hex_rgb(s)?;
-    Some(Color::Rgb(r, g, b))
 }
 
 /// Center a rectangle of `percent_x * percent_y` over `r`.
@@ -619,8 +602,8 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     }
 }
 
-// crossterm types live behind the bin; re-exported here for handle_key callers.
-pub use crossterm::event::{KeyCode, KeyModifiers};
+// crossterm types live behind ratatui; re-exported here for handle_key callers.
+pub use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 
 #[cfg(test)]
 mod tests {

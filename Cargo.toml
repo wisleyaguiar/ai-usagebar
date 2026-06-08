@@ -1,8 +1,8 @@
 [package]
 name = "ai-usagebar"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2024"
-rust-version = "1.86"
+rust-version = "1.88"
 license = "MIT"
 description = "Waybar widget + TUI for AI plan usage across Anthropic, OpenAI, Z.AI, OpenRouter, and DeepSeek"
 readme = "README.md"
@@ -57,8 +57,9 @@ tempfile = "3"
 directories = "5"
 thiserror = "2"
 base64 = "0.22"
-ratatui = "0.29"
-crossterm = "0.28"
+ratatui = "0.30.1"
+ratatui-bubbletea-components = "0.1"
+ratatui-bubbletea-theme = "0.1"
 
 [dev-dependencies]
 mockito = "1"

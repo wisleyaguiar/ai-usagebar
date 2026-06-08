@@ -1,27 +1,33 @@
-//! TUI rendering — tabs + body + footer.
+//! TUI rendering — Bubble Tea-style shell + vendor detail card + footer.
 
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Tabs};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::text::Line;
+use ratatui::widgets::Paragraph;
+use ratatui_bubbletea_components::{Help, KeyBinding, ListItem, SelectList};
 
+use crate::format::local_time_hms;
 use crate::tui::app::App;
+use crate::tui::app::TabState;
 use crate::tui::panels;
+use crate::tui::style::bubble_theme;
 use crate::vendor::VendorId;
+
+const WIDE_LAYOUT_MIN_WIDTH: u16 = 86;
+const SIDEBAR_WIDTH: u16 = 28;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // tabs
-            Constraint::Min(1),    // body
+            Constraint::Length(3), // header
+            Constraint::Min(1),    // nav + active panel
             Constraint::Length(1), // footer
         ])
         .split(f.area());
 
-    draw_tabs(f, app, chunks[0]);
-    draw_body(f, app, chunks[1]);
+    draw_header(f, app, chunks[0]);
+    draw_main(f, app, chunks[1]);
     draw_footer(f, app, chunks[2]);
 
     // Settings overlay sits on top — rendered last so it covers everything.
@@ -40,44 +46,72 @@ fn vendor_label(id: VendorId) -> &'static str {
     }
 }
 
-fn accent(theme: &crate::theme::Theme) -> Color {
-    parse_hex(&theme.blue).unwrap_or(Color::Cyan)
+fn draw_header(f: &mut Frame, app: &App, area: Rect) {
+    let theme = bubble_theme(&app.theme);
+    let block = theme.titled_block(" ai-usagebar ");
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let active = app.active_vendor().map(vendor_label).unwrap_or("no vendor");
+    let line = Line::from(vec![
+        theme.accent("  Usage dashboard"),
+        theme.muted(" · "),
+        theme.span(format!("{} vendors", app.vendors.len())),
+        theme.muted(" · "),
+        theme.span(format!("active {active}")),
+        theme.muted(" · "),
+        theme.muted(format!("last refresh {}", local_time_hms(app.last_refresh))),
+    ]);
+    f.render_widget(Paragraph::new(line), inner);
 }
 
-fn parse_hex(s: &str) -> Option<Color> {
-    let (r, g, b) = crate::theme::parse_hex_rgb(s)?;
-    Some(Color::Rgb(r, g, b))
+fn draw_main(f: &mut Frame, app: &App, area: Rect) {
+    if area.width >= WIDE_LAYOUT_MIN_WIDTH {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(SIDEBAR_WIDTH), Constraint::Min(1)])
+            .split(area);
+        draw_sidebar(f, app, chunks[0]);
+        draw_detail(f, app, chunks[1]);
+    } else {
+        let sidebar_height = (app.vendors.len() as u16 + 2).min(8);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(sidebar_height), Constraint::Min(1)])
+            .split(area);
+        draw_sidebar(f, app, chunks[0]);
+        draw_detail(f, app, chunks[1]);
+    }
 }
 
-fn draw_tabs(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    let titles: Vec<Line> = app
+fn draw_sidebar(f: &mut Frame, app: &App, area: Rect) {
+    let theme = bubble_theme(&app.theme);
+    let block = theme
+        .titled_block(" vendors ")
+        .border_style(theme.focused_border);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let items = app
         .vendors
         .iter()
-        .map(|v| Line::from(vendor_label(*v)))
-        .collect();
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" ai-usagebar ")
-        .border_style(Style::default().fg(accent(&app.theme)));
-
-    let tabs = Tabs::new(titles)
-        .block(block)
-        .select(app.active)
-        .style(Style::default().fg(parse_hex(&app.theme.fg).unwrap_or(Color::Gray)))
-        .highlight_style(
-            Style::default()
-                .fg(accent(&app.theme))
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-        )
-        .divider(" · ");
-    f.render_widget(tabs, area);
+        .enumerate()
+        .map(|(index, vendor)| {
+            ListItem::new(vendor_label(*vendor)).description(tab_status(app.tabs.get(index)))
+        })
+        .collect::<Vec<_>>();
+    let mut list = SelectList::new(items).theme(theme);
+    list.select(Some(app.active));
+    f.render_widget(&list, inner);
 }
 
-fn draw_body(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
-    let block = Block::default()
-        .borders(Borders::LEFT | Borders::RIGHT)
-        .border_style(Style::default().fg(accent(&app.theme)));
+fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
+    let theme = bubble_theme(&app.theme);
+    let title = app
+        .active_vendor()
+        .map(|vendor| format!(" {} ", vendor_label(vendor)))
+        .unwrap_or_else(|| " details ".to_string());
+    let block = theme.titled_block(title);
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -88,21 +122,37 @@ fn draw_body(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     panels::render(f, inner, &app.theme, &sections);
 }
 
+fn tab_status(tab: Option<&TabState>) -> &'static str {
+    match tab {
+        Some(TabState::Loading) => "fetching",
+        Some(TabState::Error(_)) => "error",
+        Some(TabState::Ready(ready)) if ready.stale => "stale cache",
+        Some(TabState::Ready(ready))
+            if ready
+                .last_error
+                .as_ref()
+                .is_some_and(|(code, _)| *code != 0) =>
+        {
+            "cached"
+        }
+        Some(TabState::Ready(_)) => "ready",
+        None => "waiting",
+    }
+}
+
 fn draw_footer(f: &mut Frame, app: &App, area: ratatui::layout::Rect) {
     // The "updated HH:MM:SS" suffix used to live here, but it was
     // (a) redundant with the per-tab "Updated …" now right-aligned on the
     // title row of every panel, and (b) prone to getting cropped on narrow
     // 875x600 windows. Keep the footer to just the keybinding hints.
-    let dim_color = parse_hex(&app.theme.dim).unwrap_or(Color::DarkGray);
-    let text = Line::from(vec![
-        Span::styled(" [Tab/h-l]", Style::default().fg(accent(&app.theme))),
-        Span::styled(" switch · ", Style::default().fg(dim_color)),
-        Span::styled("[r]", Style::default().fg(accent(&app.theme))),
-        Span::styled(" refresh · ", Style::default().fg(dim_color)),
-        Span::styled("[s]", Style::default().fg(accent(&app.theme))),
-        Span::styled(" settings · ", Style::default().fg(dim_color)),
-        Span::styled("[q]", Style::default().fg(accent(&app.theme))),
-        Span::styled(" quit", Style::default().fg(dim_color)),
-    ]);
-    f.render_widget(Paragraph::new(text), area);
+    let theme = bubble_theme(&app.theme);
+    let help = Help::new([
+        KeyBinding::with_keys(["tab", "h/l"], "switch"),
+        KeyBinding::new("r", "refresh"),
+        KeyBinding::new("R", "refresh all"),
+        KeyBinding::new("s", "settings"),
+        KeyBinding::with_keys(["q", "esc"], "quit"),
+    ])
+    .theme(theme);
+    f.render_widget(&help, area);
 }

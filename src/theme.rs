@@ -137,13 +137,13 @@ impl Theme {
         if let Some(v) = parsed.color3 {
             self.yellow = v;
         }
-        if let (Some(fg), Some(bg)) = (&parsed.foreground, &parsed.background) {
-            if let Some(dim) = hex_blend(fg, bg) {
-                self.dim = dim;
-                self.marker = self.dim.clone();
-                if let Some(bar_empty) = hex_blend(bg, &self.dim) {
-                    self.bar_empty = bar_empty;
-                }
+        if let (Some(fg), Some(bg)) = (&parsed.foreground, &parsed.background)
+            && let Some(dim) = hex_blend(fg, bg)
+        {
+            self.dim = dim;
+            self.marker = self.dim.clone();
+            if let Some(bar_empty) = hex_blend(bg, &self.dim) {
+                self.bar_empty = bar_empty;
             }
         }
         self

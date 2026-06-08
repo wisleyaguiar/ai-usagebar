@@ -86,10 +86,10 @@ impl App {
     }
 
     pub fn select_primary(&mut self, primary: Option<VendorId>) {
-        if let Some(p) = primary {
-            if let Some(idx) = self.vendors.iter().position(|v| *v == p) {
-                self.active = idx;
-            }
+        if let Some(p) = primary
+            && let Some(idx) = self.vendors.iter().position(|v| *v == p)
+        {
+            self.active = idx;
         }
     }
 
@@ -237,8 +237,10 @@ mod tests {
     // under test is theme-agnostic.
     #[test]
     fn select_primary_moves_to_enabled_vendor() {
-        let mut app =
-            App::with_theme(vec![VendorId::Anthropic, VendorId::Openrouter], Theme::default());
+        let mut app = App::with_theme(
+            vec![VendorId::Anthropic, VendorId::Openrouter],
+            Theme::default(),
+        );
         app.select_primary(Some(VendorId::Openrouter));
         assert_eq!(app.active_vendor(), Some(VendorId::Openrouter));
     }

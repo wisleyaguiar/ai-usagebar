@@ -423,23 +423,23 @@ fn render_default_tooltip(input: &RenderInput) -> String {
         )));
     }
 
-    if let Some((code, msg)) = input.outcome.last_error.as_ref() {
-        if *code != 0 {
-            let (icon, color) = if *code >= 500 {
-                ("󰅚", theme.red.as_str())
-            } else {
-                ("󰀪", theme.orange.as_str())
-            };
-            lines.push(Line::Body("".into()));
-            lines.push(Line::Sep);
+    if let Some((code, msg)) = input.outcome.last_error.as_ref()
+        && *code != 0
+    {
+        let (icon, color) = if *code >= 500 {
+            ("󰅚", theme.red.as_str())
+        } else {
+            ("󰀪", theme.orange.as_str())
+        };
+        lines.push(Line::Body("".into()));
+        lines.push(Line::Sep);
+        lines.push(Line::Body(format!(
+            " <span foreground='{color}'>  {icon}  HTTP {code}</span>"
+        )));
+        for wrapped in wrap_words(&escape(msg), 35) {
             lines.push(Line::Body(format!(
-                " <span foreground='{color}'>  {icon}  HTTP {code}</span>"
+                "     <span foreground='{dim}'>{wrapped}</span>"
             )));
-            for wrapped in wrap_words(&escape(msg), 35) {
-                lines.push(Line::Body(format!(
-                    "     <span foreground='{dim}'>{wrapped}</span>"
-                )));
-            }
         }
     }
 

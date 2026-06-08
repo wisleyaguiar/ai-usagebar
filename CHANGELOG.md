@@ -11,6 +11,17 @@ Each release is also published at
 
 Nothing yet.
 
+## [0.7.0] — 2026-06-08
+
+### Changed
+
+- **TUI adopts `ratatui-bubbletea` styling and components.** The native
+  terminal app now uses a Bubble Tea-inspired dashboard layout with rounded
+  blocks, a selectable vendor sidebar, themed help text, block-style progress
+  bars, and loading spinners while preserving ai-usagebar's existing
+  usage-severity colors. The MSRV is now Rust 1.88 to match the new dependency
+  metadata.
+
 ## [0.6.0] — 2026-06-06
 
 ### Added
@@ -362,7 +373,8 @@ vendors. Highlights:
 - Live API smoke test suite (`make smoke`) that exercises the real
   undocumented endpoints to detect schema drift before users do.
 
-[Unreleased]: https://github.com/akitaonrails/ai-usagebar/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/akitaonrails/ai-usagebar/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.7.0
 [0.6.0]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.6.0
 [0.5.1]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.5.1
 [0.5.0]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.5.0

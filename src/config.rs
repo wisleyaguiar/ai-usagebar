@@ -144,17 +144,16 @@ pub fn resolve_api_key(
     env_var_name: &str,
     inline: Option<&str>,
 ) -> crate::error::Result<String> {
-    if !env_var_name.is_empty() {
-        if let Ok(v) = std::env::var(env_var_name) {
-            if !v.is_empty() {
-                return Ok(v);
-            }
-        }
+    if !env_var_name.is_empty()
+        && let Ok(v) = std::env::var(env_var_name)
+        && !v.is_empty()
+    {
+        return Ok(v);
     }
-    if let Some(v) = inline {
-        if !v.is_empty() {
-            return Ok(v.to_string());
-        }
+    if let Some(v) = inline
+        && !v.is_empty()
+    {
+        return Ok(v.to_string());
     }
     Err(crate::error::AppError::Credentials(format!(
         "{vendor_label}: no API key. Either export {env_var_name} or set \

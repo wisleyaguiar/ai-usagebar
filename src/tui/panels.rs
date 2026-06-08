@@ -5,16 +5,18 @@
 //! them out vertically with consistent spacing so every panel has the same
 //! visual rhythm regardless of vendor.
 //!
-//! Progress bars use [`ratatui::widgets::Gauge`] which scales to the
-//! available width — so on a wide monitor you get long, readable bars
-//! instead of the 20-char Pango ones the Waybar tooltip is stuck with.
+//! Progress bars use Bubble Tea-style block glyphs that scale to the available
+//! width, so on a wide monitor you get long, readable bars instead of the
+//! 20-char Pango ones the Waybar tooltip is stuck with.
 
 use chrono::{DateTime, Utc};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Gauge, Paragraph};
+use ratatui::widgets::Paragraph;
+use ratatui_bubbletea_components::{Progress, Spinner, SpinnerFrames};
+use ratatui_bubbletea_theme::BubbleTheme;
 
 use crate::countdown;
 use crate::format::local_time_hms;
@@ -22,6 +24,7 @@ use crate::pacing::{self, PaceSeverity};
 use crate::pango::severity_for;
 use crate::theme::Theme;
 use crate::tui::app::TabState;
+use crate::tui::style::{bubble_theme, color, progress_theme, severity_color};
 use crate::usage::VendorSnapshot;
 
 /// One row of the panel body. Vendors emit a `Vec<Section>`; the renderer
@@ -91,14 +94,14 @@ pub fn sections_for(tab: &TabState, now: DateTime<Utc>, pace_tolerance: u32) -> 
                 *right = Some(updated);
             }
             // Error footer (when present) still lives in the body.
-            if let Some((code, msg)) = last_error {
-                if *code != 0 {
-                    sections.push(Section::Spacer);
-                    sections.push(Section::Text {
-                        label: format!("HTTP {code}"),
-                        value: msg.clone(),
-                    });
-                }
+            if let Some((code, msg)) = last_error
+                && *code != 0
+            {
+                sections.push(Section::Spacer);
+                sections.push(Section::Text {
+                    label: format!("HTTP {code}"),
+                    value: msg.clone(),
+                });
             }
             sections
         }
@@ -311,6 +314,7 @@ pub fn render(f: &mut Frame, area: Rect, theme: &Theme, sections: &[Section]) {
     if sections.is_empty() {
         return;
     }
+    let bubble = bubble_theme(theme);
     // Heuristic: if the last section is a Text starting with "  Updated",
     // pin it to the bottom. Otherwise just lay everything out top-down.
     let pin_last =
@@ -337,10 +341,16 @@ pub fn render(f: &mut Frame, area: Rect, theme: &Theme, sections: &[Section]) {
         .split(area);
 
     for (i, s) in sections[..body_end].iter().enumerate() {
-        render_section(f, chunks[i], theme, s);
+        render_section(f, chunks[i], theme, &bubble, s);
     }
     if pin_last {
-        render_section(f, chunks[chunks.len() - 1], theme, sections.last().unwrap());
+        render_section(
+            f,
+            chunks[chunks.len() - 1],
+            theme,
+            &bubble,
+            sections.last().unwrap(),
+        );
     }
 }
 
@@ -354,24 +364,19 @@ fn section_height(s: &Section) -> Constraint {
     }
 }
 
-fn render_section(f: &mut Frame, area: Rect, theme: &Theme, s: &Section) {
-    let accent = parse_hex(&theme.blue).unwrap_or(Color::Cyan);
-    let dim = parse_hex(&theme.dim).unwrap_or(Color::DarkGray);
-    let fg = parse_hex(&theme.fg).unwrap_or(Color::White);
-
+fn render_section(f: &mut Frame, area: Rect, theme: &Theme, bubble: &BubbleTheme, s: &Section) {
     match s {
         Section::Title { left, right } => {
             // Left: bold accent-colored plan/vendor label. Right: dim-styled
             // "Updated HH:MM:SS" pinned to the right edge of the title row.
             let left_line = Line::from(Span::styled(
-                format!("  {left}"),
-                Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                format!("  {} {left}", bubble.symbols.selected),
+                bubble.title,
             ));
             f.render_widget(Paragraph::new(left_line), area);
             if let Some(rt) = right {
                 let right_line =
-                    Line::from(Span::styled(format!("{rt}  "), Style::default().fg(dim)))
-                        .right_aligned();
+                    Line::from(Span::styled(format!("{rt}  "), bubble.muted)).right_aligned();
                 f.render_widget(Paragraph::new(right_line), area);
             }
         }
@@ -385,6 +390,7 @@ fn render_section(f: &mut Frame, area: Rect, theme: &Theme, s: &Section) {
             f,
             area,
             theme,
+            bubble,
             label,
             *pct,
             *severity,
@@ -392,19 +398,45 @@ fn render_section(f: &mut Frame, area: Rect, theme: &Theme, s: &Section) {
             footnote,
         ),
         Section::Text { label, value } => {
+            if label.is_empty() && value.contains("Loading") {
+                render_loading(f, area, bubble);
+                return;
+            }
+            if label == "Error" {
+                let line = Line::from(vec![
+                    bubble.error(format!("  {} ", bubble.symbols.cross)),
+                    Span::styled(value.clone(), bubble.error.add_modifier(Modifier::BOLD)),
+                ]);
+                f.render_widget(Paragraph::new(line), area);
+                return;
+            }
             let mut spans = Vec::new();
             if !label.is_empty() {
                 spans.push(Span::styled(
                     format!("  {label}  "),
-                    Style::default().fg(fg).add_modifier(Modifier::BOLD),
+                    bubble.text.add_modifier(Modifier::BOLD),
                 ));
             }
-            spans.push(Span::styled(value.clone(), Style::default().fg(dim)));
+            spans.push(Span::styled(value.clone(), bubble.muted));
             f.render_widget(Paragraph::new(Line::from(spans)), area);
         }
-        Section::Block { label, body } => render_block(f, area, theme, label, body),
+        Section::Block { label, body } => render_block(f, area, bubble, label, body),
         Section::Spacer => {}
     }
+}
+
+fn render_loading(f: &mut Frame, area: Rect, bubble: &BubbleTheme) {
+    let frames = SpinnerFrames::DOTS;
+    let frame_count = frames.frames().len().max(1);
+    let frame = chrono::Utc::now().timestamp_millis().unsigned_abs() as usize / 120;
+    let mut spinner = Spinner::new()
+        .frames(frames)
+        .label("Fetching usage data")
+        .theme(*bubble);
+    for _ in 0..(frame % frame_count) {
+        spinner.tick();
+    }
+    f.render_widget(&spinner, area);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -412,22 +444,15 @@ fn render_metric(
     f: &mut Frame,
     area: Rect,
     theme: &Theme,
+    bubble: &BubbleTheme,
     label: &str,
     pct: u16,
     severity: PaceSeverity,
     value_label: &str,
     footnote: &str,
 ) {
-    let fg = parse_hex(&theme.fg).unwrap_or(Color::White);
-    let dim = parse_hex(&theme.dim).unwrap_or(Color::DarkGray);
-    let bar_color = match severity {
-        PaceSeverity::Low => parse_hex(&theme.green),
-        PaceSeverity::Mid => parse_hex(&theme.yellow),
-        PaceSeverity::High => parse_hex(&theme.orange),
-        PaceSeverity::Critical => parse_hex(&theme.red),
-    }
-    .unwrap_or(Color::Green);
-    let bar_empty = parse_hex(&theme.bar_empty).unwrap_or(Color::Black);
+    let bar_color = severity_color(theme, bubble, severity);
+    let bar_empty = color(&theme.bar_empty).unwrap_or(bubble.palette.selected_background);
 
     let inner = Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
@@ -441,7 +466,7 @@ fn render_metric(
     // Row 1: label
     let label_line = Line::from(Span::styled(
         format!("  {label}"),
-        Style::default().fg(fg).add_modifier(Modifier::BOLD),
+        bubble.text.add_modifier(Modifier::BOLD),
     ));
     f.render_widget(Paragraph::new(label_line), inner[0]);
 
@@ -460,12 +485,11 @@ fn render_metric(
         width: value_w,
         height: 1,
     };
-    let gauge = Gauge::default()
-        .block(Block::default())
-        .gauge_style(Style::default().fg(bar_color).bg(bar_empty))
-        .percent(pct)
-        .label("");
-    f.render_widget(gauge, gauge_area);
+    let progress_theme = progress_theme(*bubble, bar_color, bar_empty);
+    let progress = Progress::from_percent(pct)
+        .theme(progress_theme)
+        .show_percentage(false);
+    f.render_widget(&progress, gauge_area);
     let value = Paragraph::new(Line::from(Span::styled(
         value_label.to_string(),
         Style::default().fg(bar_color).add_modifier(Modifier::BOLD),
@@ -473,33 +497,19 @@ fn render_metric(
     f.render_widget(value, value_area);
 
     // Row 3: footnote (dim)
-    let foot = Line::from(Span::styled(
-        format!("    {footnote}"),
-        Style::default().fg(dim),
-    ));
+    let foot = Line::from(Span::styled(format!("    {footnote}"), bubble.muted));
     f.render_widget(Paragraph::new(foot), inner[2]);
 }
 
-fn render_block(f: &mut Frame, area: Rect, theme: &Theme, label: &str, body: &[String]) {
-    let fg = parse_hex(&theme.fg).unwrap_or(Color::White);
-    let dim = parse_hex(&theme.dim).unwrap_or(Color::DarkGray);
-
+fn render_block(f: &mut Frame, area: Rect, bubble: &BubbleTheme, label: &str, body: &[String]) {
     let mut lines = vec![Line::from(Span::styled(
         format!("  {label}"),
-        Style::default().fg(fg).add_modifier(Modifier::BOLD),
+        bubble.text.add_modifier(Modifier::BOLD),
     ))];
     for b in body {
-        lines.push(Line::from(Span::styled(
-            format!("    {b}"),
-            Style::default().fg(dim),
-        )));
+        lines.push(Line::from(Span::styled(format!("    {b}"), bubble.muted)));
     }
     f.render_widget(Paragraph::new(lines), area);
-}
-
-fn parse_hex(s: &str) -> Option<Color> {
-    let (r, g, b) = crate::theme::parse_hex_rgb(s)?;
-    Some(Color::Rgb(r, g, b))
 }
 
 #[cfg(test)]

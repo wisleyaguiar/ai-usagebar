@@ -3,4 +3,5 @@
 pub mod app;
 pub mod panels;
 pub mod settings;
+pub mod style;
 pub mod view;

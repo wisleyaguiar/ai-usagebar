@@ -15,15 +15,15 @@ use ai_usagebar::tui::app::{App, REFRESH_INTERVAL, TabState, refresh_one};
 use ai_usagebar::tui::view::draw;
 use ai_usagebar::vendor::{HTTP_CLIENT_TIMEOUT, VendorId};
 use chrono::Utc;
-use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
-};
-use crossterm::execute;
-use crossterm::terminal::{
-    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
-};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use ratatui::crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+};
+use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+};
 use reqwest::Client;
 use tokio::sync::mpsc;
 
@@ -76,7 +76,10 @@ async fn event_loop<B: ratatui::backend::Backend>(
     app: &mut App,
     client: &Client,
     config: &mut Config,
-) -> io::Result<()> {
+) -> io::Result<()>
+where
+    io::Error: From<B::Error>,
+{
     // Kick off initial fetches for every vendor in parallel.
     let (tx, mut rx) = mpsc::unbounded_channel::<(usize, TabState)>();
     spawn_all(app, client, config, &tx);
@@ -104,57 +107,57 @@ async fn event_loop<B: ratatui::backend::Backend>(
             // up promptly when nothing else is going on.
             res = tokio::task::spawn_blocking(|| event::poll(Duration::from_millis(150))) => {
                 let polled = res.unwrap_or(Ok(false)).unwrap_or(false);
-                if polled {
-                    if let Ok(Event::Key(k)) = event::read() {
-                        // On Windows Terminal (and terminals advertising the
-                        // Kitty keyboard protocol) crossterm reports key Repeat
-                        // (auto-repeat while held) and Release events in addition
-                        // to Press. Acting on anything but Press makes one tap
-                        // move several tabs and holding a key fly through them.
-                        // Treat each *press* as exactly one action; ignore
-                        // Repeat and Release entirely.
-                        if k.kind != KeyEventKind::Press {
-                            continue;
-                        }
-                        // Settings overlay consumes all keys when open.
-                        if let Some(s) = app.settings.as_mut() {
-                            use ai_usagebar::tui::settings::{Action as SAction, handle_key as shandle};
-                            match shandle(s, k.code, k.modifiers) {
-                                SAction::Continue => {}
-                                SAction::Close => app.settings = None,
-                                SAction::SavedAndClose => {
-                                    app.settings = None;
-                                    // Re-load config so the new primary takes effect
-                                    // on the next render, and queue an immediate refresh
-                                    // of all vendors so newly-set API keys are picked up.
-                                    *config = ai_usagebar::config::Config::load().unwrap_or_default();
-                                    app.select_primary(config.ui.primary);
-                                    spawn_all(app, client, config, &tx);
-                                }
-                            }
-                            continue;
-                        }
-                        // Normal key handling (settings closed).
-                        if matches!(k.code, KeyCode::Char('s')) {
-                            let cfg = ai_usagebar::config::Config::load().unwrap_or_default();
-                            app.settings = Some(
-                                ai_usagebar::tui::settings::SettingsState::from_config(&cfg),
-                            );
-                            continue;
-                        }
-                        if handle_key(app, k.code, k.modifiers) {
-                            return Ok(());
-                        }
-                        // Refresh-on-key handling.
-                        if matches!(k.code, KeyCode::Char('r')) {
-                            if let Some(v) = app.active_vendor() {
-                                let idx = app.active;
-                                spawn_one(app, idx, v, client, config, &tx);
+                if polled
+                    && let Ok(Event::Key(k)) = event::read()
+                {
+                    // On Windows Terminal (and terminals advertising the
+                    // Kitty keyboard protocol) crossterm reports key Repeat
+                    // (auto-repeat while held) and Release events in addition
+                    // to Press. Acting on anything but Press makes one tap
+                    // move several tabs and holding a key fly through them.
+                    // Treat each *press* as exactly one action; ignore
+                    // Repeat and Release entirely.
+                    if k.kind != KeyEventKind::Press {
+                        continue;
+                    }
+                    // Settings overlay consumes all keys when open.
+                    if let Some(s) = app.settings.as_mut() {
+                        use ai_usagebar::tui::settings::{Action as SAction, handle_key as shandle};
+                        match shandle(s, k.code, k.modifiers) {
+                            SAction::Continue => {}
+                            SAction::Close => app.settings = None,
+                            SAction::SavedAndClose => {
+                                app.settings = None;
+                                // Re-load config so the new primary takes effect
+                                // on the next render, and queue an immediate refresh
+                                // of all vendors so newly-set API keys are picked up.
+                                *config = ai_usagebar::config::Config::load().unwrap_or_default();
+                                app.select_primary(config.ui.primary);
+                                spawn_all(app, client, config, &tx);
                             }
                         }
-                        if matches!(k.code, KeyCode::Char('R')) {
-                            spawn_all(app, client, config, &tx);
-                        }
+                        continue;
+                    }
+                    // Normal key handling (settings closed).
+                    if matches!(k.code, KeyCode::Char('s')) {
+                        let cfg = ai_usagebar::config::Config::load().unwrap_or_default();
+                        app.settings = Some(
+                            ai_usagebar::tui::settings::SettingsState::from_config(&cfg),
+                        );
+                        continue;
+                    }
+                    if handle_key(app, k.code, k.modifiers) {
+                        return Ok(());
+                    }
+                    // Refresh-on-key handling.
+                    if matches!(k.code, KeyCode::Char('r'))
+                        && let Some(v) = app.active_vendor()
+                    {
+                        let idx = app.active;
+                        spawn_one(app, idx, v, client, config, &tx);
+                    }
+                    if matches!(k.code, KeyCode::Char('R')) {
+                        spawn_all(app, client, config, &tx);
                     }
                 }
             }

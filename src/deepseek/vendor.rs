@@ -146,23 +146,23 @@ fn render_tooltip(
         " <span foreground='{dim}'>  󰛴  {avail_label}</span>"
     )));
 
-    if let Some((code, msg)) = outcome.last_error.as_ref() {
-        if *code != 0 {
-            let (icon, ecolor) = if *code >= 500 {
-                ("󰅚", theme.red.as_str())
-            } else {
-                ("󰀪", theme.orange.as_str())
-            };
-            lines.push(TooltipLine::Body("".into()));
-            lines.push(TooltipLine::Sep);
-            lines.push(TooltipLine::Body(format!(
-                " <span foreground='{ecolor}'>  {icon}  HTTP {code}</span>"
-            )));
-            lines.push(TooltipLine::Body(format!(
-                "     <span foreground='{dim}'>{}</span>",
-                escape(msg)
-            )));
-        }
+    if let Some((code, msg)) = outcome.last_error.as_ref()
+        && *code != 0
+    {
+        let (icon, ecolor) = if *code >= 500 {
+            ("󰅚", theme.red.as_str())
+        } else {
+            ("󰀪", theme.orange.as_str())
+        };
+        lines.push(TooltipLine::Body("".into()));
+        lines.push(TooltipLine::Sep);
+        lines.push(TooltipLine::Body(format!(
+            " <span foreground='{ecolor}'>  {icon}  HTTP {code}</span>"
+        )));
+        lines.push(TooltipLine::Body(format!(
+            "     <span foreground='{dim}'>{}</span>",
+            escape(msg)
+        )));
     }
 
     let updated = updated_at_hm(now, outcome.cache_age);
