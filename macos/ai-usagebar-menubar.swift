@@ -189,6 +189,10 @@ let VENDOR_AUTH: [VendorAuth] = [
     VendorAuth(id: "zai", name: "Z.AI (GLM)", kind: "apikey", cli: "", login: "", pkg: "", env: "ZAI_API_KEY"),
     VendorAuth(id: "openrouter", name: "OpenRouter", kind: "apikey", cli: "", login: "", pkg: "", env: "OPENROUTER_API_KEY"),
     VendorAuth(id: "deepseek", name: "DeepSeek", kind: "apikey", cli: "", login: "", pkg: "", env: "DEEPSEEK_API_KEY"),
+    // "local" = no credentials; usage is read from the opencode CLI's local
+    // SQLite DB. Configured ⇔ that DB exists (plus [opencode] enabled=true
+    // in the ai-usagebar config, editable via the TUI/config file).
+    VendorAuth(id: "opencode", name: "OpenCode Go", kind: "local", cli: "opencode", login: "", pkg: "", env: ""),
 ]
 
 func configHasApiKeyTOML(_ section: String) -> Bool {
@@ -224,6 +228,9 @@ func vendorConfigured(_ v: VendorAuth) -> Bool {
     }
     if v.id == "openai" {
         return fm.fileExists(atPath: "\(home)/.codex/auth.json")
+    }
+    if v.id == "opencode" {
+        return fm.fileExists(atPath: "\(home)/.local/share/opencode/opencode.db")
     }
     if let e = ProcessInfo.processInfo.environment[v.env], !e.isEmpty { return true }
     return configHasApiKeyTOML(v.id)
@@ -333,6 +340,7 @@ struct VendorsSection: View {
             if cliPresent[v.id] == false { return "⚠ \(v.cli) não instalado" }
             return "⚠ Não logado — \(v.login)"
         }
+        if v.kind == "local" { return "⚠ \(v.cli) não instalado — sem banco local" }
         return "⚠ Sem API key — \(v.env)"
     }
 
@@ -368,7 +376,7 @@ struct SettingsView: View {
     @AppStorage("colorEmpty") private var colorEmpty = "#3e4451"
     @AppStorage("binaryPath") private var binaryPath = ""
 
-    private let vendors = ["anthropic", "openai", "zai", "openrouter", "deepseek"]
+    private let vendors = ["anthropic", "openai", "zai", "openrouter", "deepseek", "opencode"]
 
     var body: some View {
         Form {
@@ -546,7 +554,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if SHOW_SESSION { seg("5h", s.session.pct, "\(s.session.pct)%") }
         if SHOW_WEEKLY { seg("7d", s.weekly.pct, "\(s.weekly.pct)%") }
-        if SHOW_EXTRA, let e = s.extra { seg("ex", e.pct, e.spent) }
+        // For OpenCode Go the money bucket is the monthly window, not
+        // Anthropic-style pay-as-you-go extra usage.
+        if SHOW_EXTRA, let e = s.extra { seg(VENDOR == "opencode" ? "mo" : "ex", e.pct, e.spent) }
         statusItem.button?.attributedTitle = title.length > 0 ? title : run("ai", .secondaryLabelColor)
     }
 
@@ -561,15 +571,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             a.append(run(name.padding(toLength: 12, withPad: " ", startingAt: 0), .labelColor))
             a.append(barAttr(pct: pct, width: MENU_BAR_W))
             a.append(run("  \(value)", colorForPct(pct)))
-            if let r = reset, !r.isEmpty { a.append(run("   ↺ \(r)", .secondaryLabelColor)) }
+            if let r = reset, !r.isEmpty, r != "—" { a.append(run("   ↺ \(r)", .secondaryLabelColor)) }
             item.attributedTitle = a
         }
         row("session", "Session", s.session.pct, "\(s.session.pct)%", s.session.reset)
         row("weekly", "Weekly", s.weekly.pct, "\(s.weekly.pct)%", s.weekly.reset)
         if let sn = s.sonnet { row("sonnet", "Sonnet only", sn.pct, "\(sn.pct)%", sn.reset) }
         else { rows["sonnet"]?.isHidden = true }
-        if let e = s.extra { row("extra", "Extra usage", e.pct, "\(e.spent) / \(e.limit)", nil) }
-        else { rows["extra"]?.isHidden = true }
+        if let e = s.extra {
+            let label = VENDOR == "opencode" ? "Monthly" : "Extra usage"
+            row("extra", label, e.pct, "\(e.spent) / \(e.limit)", nil)
+        } else { rows["extra"]?.isHidden = true }
     }
 
     func setError(_ msg: String) {

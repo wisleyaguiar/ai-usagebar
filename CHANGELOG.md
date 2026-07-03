@@ -21,6 +21,13 @@ Each release is also published at
   window, a native TUI panel, `{oc_*}` format placeholders, and hermetic
   tests against a fixture DB. Disabled by default. New dependency:
   `rusqlite` (bundled SQLite, so AUR/macOS builds need no libsqlite3).
+  The vendor also fills the cross-vendor `{extra_pct}`/`{extra_spent}`/
+  `{extra_limit}` aliases with the monthly window, so the GNOME extension
+  and the macOS menu bar app render a third (monthly) bar unchanged.
+- **macOS menu bar app: OpenCode Go support** — `opencode` in the vendor
+  picker, an OpenCode Go row in the Vendors section (configured ⇔ the
+  opencode CLI's local DB exists), a "Monthly" dropdown row for the Go
+  dollar cap, and rolling windows no longer render a dangling "↺ —" reset.
 
 ## [0.8.0] — 2026-07-01
 

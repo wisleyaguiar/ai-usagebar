@@ -29,6 +29,12 @@ pub fn build_placeholders(snap: &OpencodeSnapshot) -> HashMap<&'static str, Stri
         ("weekly_pct", snap.pct_week().to_string()),
         ("weekly_reset", "—".to_string()),
         ("plan", "OpenCode Go".to_string()),
+        // Money-bucket aliases (Anthropic's "extra usage" slot) → monthly
+        // window, so the GNOME extension and macOS menu bar app can render a
+        // third row without knowing opencode-specific placeholders.
+        ("extra_pct", snap.pct_month().to_string()),
+        ("extra_spent", dollars(snap.spent_month)),
+        ("extra_limit", dollars(snap.limit_month)),
         ("oc_5h_spent", dollars(snap.spent_5h)),
         ("oc_5h_limit", dollars(snap.limit_5h)),
         ("oc_5h_pct", snap.pct_5h().to_string()),
@@ -279,13 +285,18 @@ mod tests {
     }
 
     #[test]
-    fn cross_vendor_aliases_map_to_5h_and_week() {
+    fn cross_vendor_aliases_map_to_5h_week_and_month() {
         let values = build_placeholders(&sample_snap());
         assert_eq!(values.get("session_pct").map(String::as_str), Some("43"));
         assert_eq!(values.get("weekly_pct").map(String::as_str), Some("50"));
         // Rolling windows have no reset instant.
         assert_eq!(values.get("session_reset").map(String::as_str), Some("—"));
         assert_eq!(values.get("plan").map(String::as_str), Some("OpenCode Go"));
+        // The money-denominated bucket aliases (used by the GNOME extension
+        // and macOS menu bar app) map to the monthly window.
+        assert_eq!(values.get("extra_pct").map(String::as_str), Some("75"));
+        assert_eq!(values.get("extra_spent").map(String::as_str), Some("$45.00"));
+        assert_eq!(values.get("extra_limit").map(String::as_str), Some("$60.00"));
     }
 
     #[test]
