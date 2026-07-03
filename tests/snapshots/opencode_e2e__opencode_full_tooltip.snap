@@ -1,0 +1,25 @@
+---
+source: tests/opencode_e2e.rs
+expression: "normalize_updated_time(&out.tooltip, now(), cache_age)"
+---
+<span foreground='#61afef'>╭────────────────────────────────────────────────────╮</span>
+<span foreground='#61afef'>│</span>                    <span font_weight='bold' foreground='#61afef'>OpenCode Go</span>                     <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>──────────────────────────────────────────────────</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                                                    <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#abb2bf'>  󰔛  5h window</span>                                     <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#98c379'>███████</span><span foreground='#3e4451'>░░░░░░░░░░░░░</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#5c6370'>$4.16 of $12.00 · </span><span font_weight='bold' foreground='#98c379'>35%</span>                            <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                                                    <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#abb2bf'>  󰃭  Weekly (7d)</span>                                   <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#98c379'>█████</span><span foreground='#3e4451'>░░░░░░░░░░░░░░░</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#5c6370'>$8.50 of $30.00 · </span><span font_weight='bold' foreground='#98c379'>28%</span>                            <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                                                    <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#abb2bf'>  󰸗  Monthly (30d)</span>                                 <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#d19a66'>███████████████</span><span foreground='#3e4451'>░░░░░</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#5c6370'>$45.00 of $60.00 · </span><span font_weight='bold' foreground='#d19a66'>75%</span>                           <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                                                    <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>  󰃬  4.6M tokens (30d) · top model deepseek-v4-pro</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                                                    <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>──────────────────────────────────────────────────</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>  󰅐  Updated HH:MM</span>                                 <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>╰────────────────────────────────────────────────────╯</span>

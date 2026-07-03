@@ -25,6 +25,7 @@ pub enum VendorId {
     Zai,
     Openrouter,
     Deepseek,
+    Opencode,
 }
 
 impl VendorId {
@@ -35,6 +36,7 @@ impl VendorId {
             VendorId::Zai => "zai",
             VendorId::Openrouter => "openrouter",
             VendorId::Deepseek => "deepseek",
+            VendorId::Opencode => "opencode",
         }
     }
 
@@ -45,6 +47,7 @@ impl VendorId {
             VendorId::Zai,
             VendorId::Openrouter,
             VendorId::Deepseek,
+            VendorId::Opencode,
         ]
     }
 }

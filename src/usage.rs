@@ -105,6 +105,72 @@ impl Default for DeepseekSnapshot {
     }
 }
 
+/// OpenCode Go — dollar spend aggregated from the opencode CLI's local
+/// SQLite DB, measured against the Go plan's dollar limits. The limits ride
+/// along in the snapshot so a cached payload reproduces the same rendering
+/// without consulting `Config`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpencodeSnapshot {
+    /// The `providerID` filtered in the message table ("opencode-go").
+    pub provider: String,
+    /// Rolling 5-hour window spend (USD) vs. plan limit.
+    pub spent_5h: f64,
+    pub limit_5h: f64,
+    /// Rolling 7-day window.
+    pub spent_week: f64,
+    pub limit_week: f64,
+    /// Rolling 30-day window.
+    pub spent_month: f64,
+    pub limit_month: f64,
+    /// Total tokens consumed in the 30-day window.
+    pub tokens_month: i64,
+    /// Most-used modelID in the 30-day window, when any.
+    pub top_model: Option<String>,
+}
+
+impl Eq for OpencodeSnapshot {}
+
+impl Default for OpencodeSnapshot {
+    fn default() -> Self {
+        Self {
+            provider: String::new(),
+            spent_5h: 0.0,
+            limit_5h: 0.0,
+            spent_week: 0.0,
+            limit_week: 0.0,
+            spent_month: 0.0,
+            limit_month: 0.0,
+            tokens_month: 0,
+            top_model: None,
+        }
+    }
+}
+
+impl OpencodeSnapshot {
+    /// Integer percent of a dollar limit consumed (0..=100, saturating; 0
+    /// when the limit is non-positive — matches `OpenRouterSnapshot::consumed_pct`).
+    fn pct(spent: f64, limit: f64) -> i32 {
+        if limit <= 0.0 {
+            return 0;
+        }
+        ((spent / limit) * 100.0).round().clamp(0.0, 100.0) as i32
+    }
+
+    pub fn pct_5h(&self) -> i32 {
+        Self::pct(self.spent_5h, self.limit_5h)
+    }
+    pub fn pct_week(&self) -> i32 {
+        Self::pct(self.spent_week, self.limit_week)
+    }
+    pub fn pct_month(&self) -> i32 {
+        Self::pct(self.spent_month, self.limit_month)
+    }
+    /// Worst-of percentage across the three windows — drives severity.
+    pub fn max_pct(&self) -> i32 {
+        self.pct_5h().max(self.pct_week()).max(self.pct_month())
+    }
+}
+
 /// Discriminated union of vendor-specific snapshots. The widget and TUI match
 /// on this to pick a renderer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,6 +180,7 @@ pub enum VendorSnapshot {
     Zai(ZaiSnapshot),
     Openrouter(OpenRouterSnapshot),
     Deepseek(DeepseekSnapshot),
+    Opencode(OpencodeSnapshot),
 }
 
 /// OpenAI Codex OAuth — mirrors Anthropic's two-window + extras pattern.
@@ -307,6 +374,53 @@ mod tests {
     fn severity_promotes_extra_when_session_at_100() {
         let s = snap(100, 50, None, Some((10000, 9500)));
         assert_eq!(anthropic_severity(&s), PaceSeverity::Critical); // 100 → critical
+    }
+
+    fn oc_snap(spent_5h: f64, spent_week: f64, spent_month: f64) -> OpencodeSnapshot {
+        OpencodeSnapshot {
+            provider: "opencode-go".into(),
+            spent_5h,
+            limit_5h: 12.0,
+            spent_week,
+            limit_week: 30.0,
+            spent_month,
+            limit_month: 60.0,
+            tokens_month: 0,
+            top_model: None,
+        }
+    }
+
+    #[test]
+    fn opencode_pct_rounds_against_each_limit() {
+        let s = oc_snap(5.16, 15.0, 45.0);
+        assert_eq!(s.pct_5h(), 43); // 5.16/12 = 43%
+        assert_eq!(s.pct_week(), 50);
+        assert_eq!(s.pct_month(), 75);
+    }
+
+    #[test]
+    fn opencode_pct_clamps_to_100_when_over_limit() {
+        let s = oc_snap(15.0, 40.0, 70.0);
+        assert_eq!(s.pct_5h(), 100);
+        assert_eq!(s.pct_week(), 100);
+        assert_eq!(s.pct_month(), 100);
+    }
+
+    #[test]
+    fn opencode_pct_zero_limit_is_zero() {
+        let mut s = oc_snap(5.0, 5.0, 5.0);
+        s.limit_5h = 0.0;
+        s.limit_week = -1.0;
+        s.limit_month = 0.0;
+        assert_eq!(s.pct_5h(), 0);
+        assert_eq!(s.pct_week(), 0);
+        assert_eq!(s.pct_month(), 0);
+    }
+
+    #[test]
+    fn opencode_max_pct_picks_worst_window() {
+        let s = oc_snap(1.2, 24.0, 30.0); // 10% / 80% / 50%
+        assert_eq!(s.max_pct(), 80);
     }
 
     #[test]

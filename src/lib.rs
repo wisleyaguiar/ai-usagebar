@@ -17,6 +17,7 @@ pub mod deepseek;
 pub mod error;
 pub mod format;
 pub mod openai;
+pub mod opencode;
 pub mod openrouter;
 pub mod pacing;
 pub mod pango;

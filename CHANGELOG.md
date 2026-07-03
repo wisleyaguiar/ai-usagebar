@@ -9,7 +9,18 @@ Each release is also published at
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **OpenCode Go vendor** (`--vendor opencode`) — the first local-first vendor:
+  instead of calling an HTTP API, it aggregates per-message dollar spend from
+  the opencode CLI's local SQLite DB (`~/.local/share/opencode/opencode.db`,
+  opened strictly read-only) and shows it against the Go plan's dollar caps
+  ($12/5h, $30/week, $60/month — configurable under `[opencode]`, since
+  OpenCode exposes neither the limits nor a usage API; windows are assumed
+  rolling). Includes bar text, bordered tooltip with one progress bar per
+  window, a native TUI panel, `{oc_*}` format placeholders, and hermetic
+  tests against a fixture DB. Disabled by default. New dependency:
+  `rusqlite` (bundled SQLite, so AUR/macOS builds need no libsqlite3).
 
 ## [0.8.0] — 2026-07-01
 

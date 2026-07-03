@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::deepseek;
 use crate::error::{AppError, Result};
 use crate::openai;
+use crate::opencode;
 use crate::openrouter;
 use crate::theme::Theme;
 use crate::vendor::{HTTP_CLIENT_TIMEOUT, RenderOpts, VendorOutcome};
@@ -108,7 +109,45 @@ async fn build_output(cli: &Cli) -> Result<WaybarOutput> {
         Vendor::Openai => openai_output(cli, &config).await,
         Vendor::Zai => zai_output(cli, &config).await,
         Vendor::Deepseek => deepseek_output(cli, &config).await,
+        Vendor::Opencode => opencode_output(cli, &config).await,
     }
+}
+
+/// Local-first vendor: no HTTP client, no API key — reads the opencode CLI's
+/// SQLite DB and aggregates spend against the Go plan's dollar limits.
+async fn opencode_output(cli: &Cli, config: &Config) -> Result<WaybarOutput> {
+    let cache = vendor_cache(cli, "opencode")?;
+    let db_path = match config.opencode.db_path.as_deref() {
+        Some(p) => p.to_path_buf(),
+        None => opencode::default_db_path()?,
+    };
+    let limits = opencode::types::Limits::from_config(&config.opencode);
+    let outcome = match opencode::fetch_snapshot(
+        &db_path,
+        &config.opencode.provider,
+        &limits,
+        &cache,
+        DEFAULT_TTL,
+        Utc::now(),
+    )
+    .await
+    {
+        Ok(o) => o,
+        Err(e) if e.is_transient() => return Ok(WaybarOutput::loading(cli.icon.as_deref())),
+        Err(e) => return Err(e),
+    };
+
+    let theme = theme_from_cli(cli);
+    let snap = outcome.snapshot.clone();
+    let vendor_outcome: VendorOutcome = outcome.into();
+    let opts = RenderOpts::from_cli(cli);
+    Ok(opencode::vendor::render(
+        &vendor_outcome,
+        &snap,
+        &theme,
+        &opts,
+        Utc::now(),
+    ))
 }
 
 async fn openai_output(cli: &Cli, config: &Config) -> Result<WaybarOutput> {

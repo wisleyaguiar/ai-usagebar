@@ -82,6 +82,7 @@ pub fn sections_for(tab: &TabState, now: DateTime<Utc>, pace_tolerance: u32) -> 
                 VendorSnapshot::Zai(s) => zai_sections(s, now),
                 VendorSnapshot::Openrouter(s) => openrouter_sections(s),
                 VendorSnapshot::Deepseek(s) => deepseek_sections(s),
+                VendorSnapshot::Opencode(s) => opencode_sections(s),
             };
             // Inject the (already-absolute) fetched-at instant into the title
             // row, right-aligned. Pre-snapshotted in app::refresh_one so it
@@ -270,6 +271,43 @@ fn deepseek_sections(s: &crate::usage::DeepseekSnapshot) -> Vec<Section> {
     v.push(Section::Block {
         label: "API".into(),
         body: vec![avail.into()],
+    });
+    v
+}
+
+fn opencode_sections(s: &crate::usage::OpencodeSnapshot) -> Vec<Section> {
+    fn push_dollar_window(v: &mut Vec<Section>, label: &str, spent: f64, limit: f64, pct: i32) {
+        v.push(Section::Spacer);
+        v.push(Section::Metric {
+            label: label.into(),
+            pct: pct.clamp(0, 100) as u16,
+            severity: severity_for(pct),
+            value_label: format!("${spent:.2} of ${limit:.2}"),
+            footnote: format!("{pct}% of the rolling dollar limit"),
+        });
+    }
+
+    let mut v = vec![Section::Title {
+        left: "OpenCode Go".into(),
+        right: None,
+    }];
+    push_dollar_window(&mut v, "5h window", s.spent_5h, s.limit_5h, s.pct_5h());
+    push_dollar_window(&mut v, "Weekly (7d)", s.spent_week, s.limit_week, s.pct_week());
+    push_dollar_window(
+        &mut v,
+        "Monthly (30d)",
+        s.spent_month,
+        s.limit_month,
+        s.pct_month(),
+    );
+    v.push(Section::Spacer);
+    v.push(Section::Block {
+        label: "Usage (30d)".into(),
+        body: vec![format!(
+            "{} tokens · top model {}",
+            crate::opencode::vendor::compact_tokens(s.tokens_month),
+            s.top_model.as_deref().unwrap_or("—")
+        )],
     });
     v
 }
@@ -662,6 +700,39 @@ mod tests {
         assert!(sections.iter().any(|s| matches!(
             s,
             Section::Text { value, .. } if value.contains("`r` to retry")
+        )));
+    }
+
+    #[test]
+    fn opencode_sections_have_three_window_metrics_and_usage_block() {
+        let snap = crate::usage::OpencodeSnapshot {
+            provider: "opencode-go".into(),
+            spent_5h: 5.16,
+            limit_5h: 12.0,
+            spent_week: 15.0,
+            limit_week: 30.0,
+            spent_month: 45.0,
+            limit_month: 60.0,
+            tokens_month: 389_769_308,
+            top_model: Some("deepseek-v4-pro".into()),
+        };
+        let sections = sections_for(&ready(VendorSnapshot::Opencode(snap)), now(), 5);
+        assert!(matches!(sections[0], Section::Title { .. }));
+        let metric_count = sections
+            .iter()
+            .filter(|s| matches!(s, Section::Metric { .. }))
+            .count();
+        assert_eq!(metric_count, 3);
+        // The dollar caps show as "$X of $Y" value labels.
+        assert!(sections.iter().any(|s| matches!(
+            s,
+            Section::Metric { value_label, .. } if value_label.contains("$5.16 of $12.00")
+        )));
+        // Tokens + top model land in a dim block.
+        assert!(sections.iter().any(|s| matches!(
+            s,
+            Section::Block { body, .. }
+                if body.iter().any(|b| b.contains("deepseek-v4-pro"))
         )));
     }
 

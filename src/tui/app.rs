@@ -221,6 +221,25 @@ async fn build_outcome(
                     .await?;
             Ok(outcome.into())
         }
+        VendorId::Opencode => {
+            let cache = crate::cache::Cache::for_vendor("opencode")?;
+            let db_path = config
+                .opencode
+                .db_path
+                .clone()
+                .unwrap_or_else(|| crate::opencode::default_db_path().unwrap_or_default());
+            let limits = crate::opencode::types::Limits::from_config(&config.opencode);
+            let outcome = crate::opencode::fetch_snapshot(
+                &db_path,
+                &config.opencode.provider,
+                &limits,
+                &cache,
+                DEFAULT_TTL,
+                Utc::now(),
+            )
+            .await?;
+            Ok(outcome.into())
+        }
     }
 }
 

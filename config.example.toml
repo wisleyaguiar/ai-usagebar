@@ -8,7 +8,7 @@
 [ui]
 # Which vendor the widget shows when `--vendor` is omitted, AND which tab
 # is selected when the TUI opens. Comment out to default to Anthropic.
-# Valid: anthropic | openai | zai | openrouter | deepseek
+# Valid: anthropic | openai | zai | openrouter | deepseek | opencode
 # primary = "anthropic"
 
 [anthropic]
@@ -44,3 +44,20 @@ api_key_env = "OPENROUTER_API_KEY"
 enabled = false
 api_key_env = "DEEPSEEK_API_KEY"  # checked first; if set + non-empty, used
 # api_key = "sk-..."              # fallback; chmod 600 the file if you use it
+
+[opencode]
+# OpenCode Go subscription tracking. No credentials — reads the opencode
+# CLI's local SQLite DB, so it only sees usage made from this machine.
+# Disabled by default; enable if you have opencode installed.
+enabled = false
+# Path to the opencode database. Leave commented out to use the default
+# ~/.local/share/opencode/opencode.db (Linux and macOS).
+# db_path = "/home/you/.local/share/opencode/opencode.db"
+# providerID whose spend counts toward the limits below.
+provider = "opencode-go"
+# Go plan dollar caps. OpenCode doesn't expose them (or the reset schedule)
+# via any API, so they're config: we assume ROLLING 5h/7d/30d windows —
+# adjust here if OpenCode changes the plan.
+limit_5h = 12.0
+limit_week = 30.0
+limit_month = 60.0

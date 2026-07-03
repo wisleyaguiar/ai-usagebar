@@ -57,6 +57,9 @@ tempfile = "3"
 directories = "5"
 thiserror = "2"
 base64 = "0.22"
+# `bundled` compiles the SQLite amalgamation so AUR/macOS builds don't need
+# libsqlite3 headers. Used read-only against the opencode CLI's local DB.
+rusqlite = { version = "0.37", features = ["bundled"] }
 ratatui = "0.30.1"
 ratatui-bubbletea-components = "0.1"
 ratatui-bubbletea-theme = "0.1"

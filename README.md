@@ -1,6 +1,6 @@
 # ai-usagebar
 
-Waybar widget and tabbed TUI for AI plan usage across **Anthropic Claude**, **OpenAI Codex/ChatGPT**, **Z.AI (GLM)**, **OpenRouter**, and **DeepSeek**.
+Waybar widget and tabbed TUI for AI plan usage across **Anthropic Claude**, **OpenAI Codex/ChatGPT**, **Z.AI (GLM)**, **OpenRouter**, **DeepSeek**, and **OpenCode Go**.
 
 This started as a Rust port of [`claudebar`](https://github.com/mryll/claudebar) and stays drop-in compatible with it. It keeps the minimalist Pango-bordered tooltip, Omarchy theme auto-detection, and flock-protected OAuth refresh, then adds three more vendors and a proper testable codebase instead of one long shell script.
 
@@ -80,6 +80,7 @@ Each vendor authenticates a little differently. Anthropic and OpenAI use OAuth c
 | Z.AI | API key (`ZAI_API_KEY` env or `[zai] api_key` in config) | Set either. |
 | OpenRouter | API key (`OPENROUTER_API_KEY` env or `[openrouter] api_key` in config) | Set either. |
 | DeepSeek | API key (`DEEPSEEK_API_KEY` env or `[deepseek] api_key` in config) | Set either. Disabled by default — add `[deepseek] enabled = true` to config. |
+| OpenCode Go | None — reads the opencode CLI's local SQLite DB (`~/.local/share/opencode/opencode.db`) | Have [opencode](https://opencode.ai) installed. Disabled by default — add `[opencode] enabled = true` to config. |
 
 ### Credential resolution order (for API-key vendors)
 
@@ -101,13 +102,13 @@ On macOS, recent Claude Code builds don't write `~/.claude/.credentials.json` �
 
 ## Configuration
 
-`~/.config/ai-usagebar/config.toml` (optional — defaults enable Anthropic, OpenAI, Z.AI, and OpenRouter; DeepSeek is opt-in). Full example:
+`~/.config/ai-usagebar/config.toml` (optional — defaults enable Anthropic, OpenAI, Z.AI, and OpenRouter; DeepSeek and OpenCode are opt-in). Full example:
 
 ```toml
 [ui]
 # Which vendor the widget shows when --vendor is omitted, AND which tab
 # is selected when the TUI opens. Defaults to anthropic when not set.
-# primary = "anthropic"   # anthropic | openai | zai | openrouter | deepseek
+# primary = "anthropic"   # anthropic | openai | zai | openrouter | deepseek | opencode
 
 [anthropic]
 enabled = true
@@ -132,6 +133,14 @@ api_key_env = "OPENROUTER_API_KEY"
 enabled = true             # disabled by default; enable once you add an API key
 api_key_env = "DEEPSEEK_API_KEY"
 # api_key = "sk-..."       # used if DEEPSEEK_API_KEY is unset; chmod 600 the file!
+
+[opencode]
+enabled = true             # disabled by default; needs the opencode CLI installed
+# db_path = "/home/you/.local/share/opencode/opencode.db"
+provider = "opencode-go"   # providerID counted against the limits below
+limit_5h = 12.0            # OpenCode Go dollar caps — not exposed by any API,
+limit_week = 30.0          # so they live in config. Windows are ROLLING
+limit_month = 60.0         # (5h / 7d / 30d).
 ```
 
 ## Quick start
@@ -143,6 +152,7 @@ ai-usagebar --vendor openai
 ai-usagebar --vendor zai
 ai-usagebar --vendor openrouter
 ai-usagebar --vendor deepseek
+ai-usagebar --vendor opencode
 
 # Force Waybar JSON (e.g. piping into jq).
 ai-usagebar --json
@@ -208,7 +218,7 @@ If your Waybar theme puts a tray expander immediately after `custom/aibar`, such
 If you'd rather see them all at once:
 
 ```jsonc
-"modules-right": ["custom/claude", "custom/openai", "custom/openrouter", "custom/zai", "custom/deepseek"],
+"modules-right": ["custom/claude", "custom/openai", "custom/openrouter", "custom/zai", "custom/deepseek", "custom/opencode"],
 
 "custom/claude": {
     "exec": "ai-usagebar --vendor anthropic --icon '󰚩'",
@@ -239,6 +249,12 @@ If you'd rather see them all at once:
     "exec": "ai-usagebar --vendor deepseek --icon '󰧑'",
     "return-type": "json",
     "interval": 600,
+    "tooltip": true
+},
+"custom/opencode": {
+    "exec": "ai-usagebar --vendor opencode --icon '󰅩'",
+    "return-type": "json",
+    "interval": 60,
     "tooltip": true
 }
 ```
@@ -307,6 +323,10 @@ When an endpoint drifts, **run `make smoke`**. The live API tests check the exac
 ### DeepSeek
 
 `{ds_balance}`, `{ds_granted}`, `{ds_topped_up}`, `{ds_available}` — credit balance from `/user/balance`. USD is preferred when both currencies are present; falls back to CNY otherwise.
+
+### OpenCode Go
+
+`{oc_5h_spent}`, `{oc_5h_limit}`, `{oc_5h_pct}`, `{oc_week_spent}`, `{oc_week_limit}`, `{oc_week_pct}`, `{oc_month_spent}`, `{oc_month_limit}`, `{oc_month_pct}`, `{oc_tokens_month}`, `{oc_top_model}` — dollar spend per rolling window vs. the configured Go plan caps, aggregated locally from the opencode CLI's SQLite DB (no network call). Only usage made from this machine is visible; the authoritative numbers live in the [OpenCode console](https://opencode.ai/auth).
 
 ## Local development
 

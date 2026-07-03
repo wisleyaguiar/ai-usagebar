@@ -28,6 +28,7 @@ pub struct Config {
     pub zai: ZaiConfig,
     pub openrouter: OpenRouterConfig,
     pub deepseek: DeepseekConfig,
+    pub opencode: OpencodeConfig,
 }
 
 /// UI / dispatch preferences. Currently just `primary` — which vendor the
@@ -137,6 +138,39 @@ impl Default for DeepseekConfig {
     }
 }
 
+/// OpenCode Go — no credentials; reads the opencode CLI's local SQLite DB.
+/// Limits are the Go plan's dollar caps, configurable because OpenCode may
+/// change them (they're not exposed by any API).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct OpencodeConfig {
+    pub enabled: bool,
+    /// Override the opencode DB path (defaults to
+    /// `~/.local/share/opencode/opencode.db` on Linux and macOS).
+    pub db_path: Option<PathBuf>,
+    /// `providerID` to aggregate in the message table.
+    pub provider: String,
+    /// USD cap per rolling 5-hour window.
+    pub limit_5h: f64,
+    /// USD cap per rolling 7-day window.
+    pub limit_week: f64,
+    /// USD cap per rolling 30-day window.
+    pub limit_month: f64,
+}
+
+impl Default for OpencodeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            db_path: None,
+            provider: "opencode-go".to_string(),
+            limit_5h: 12.0,
+            limit_week: 30.0,
+            limit_month: 60.0,
+        }
+    }
+}
+
 /// Resolve an API key for a vendor: env var wins, then inline config, then
 /// a clear error naming both fields. Used by Z.AI and OpenRouter vendors.
 pub fn resolve_api_key(
@@ -188,6 +222,7 @@ impl Config {
             VendorId::Zai => self.zai.enabled,
             VendorId::Openrouter => self.openrouter.enabled,
             VendorId::Deepseek => self.deepseek.enabled,
+            VendorId::Opencode => self.opencode.enabled,
         }
     }
 
@@ -237,6 +272,8 @@ mod tests {
         assert!(c.is_enabled(VendorId::Openrouter));
         // DeepSeek requires an explicit API key, so it defaults to disabled.
         assert!(!c.is_enabled(VendorId::Deepseek));
+        // OpenCode requires the opencode CLI on disk, so it also defaults off.
+        assert!(!c.is_enabled(VendorId::Opencode));
         assert_eq!(c.enabled_vendors().len(), 4);
     }
 
@@ -396,6 +433,43 @@ enabled = false
                 VendorId::Openrouter,
             ]
         );
+    }
+
+    #[test]
+    fn opencode_defaults_carry_go_plan_limits() {
+        let c = OpencodeConfig::default();
+        assert!(!c.enabled);
+        assert!(c.db_path.is_none());
+        assert_eq!(c.provider, "opencode-go");
+        assert_eq!(c.limit_5h, 12.0);
+        assert_eq!(c.limit_week, 30.0);
+        assert_eq!(c.limit_month, 60.0);
+    }
+
+    #[test]
+    fn opencode_parses_overrides() {
+        let f = write_toml(
+            r#"
+            [opencode]
+            enabled = true
+            db_path = "/tmp/oc.db"
+            provider = "opencode"
+            limit_5h = 20.0
+            limit_week = 50.0
+            limit_month = 100.0
+            "#,
+        );
+        let c = Config::load_from(f.path()).unwrap();
+        assert!(c.is_enabled(VendorId::Opencode));
+        assert!(c.enabled_vendors().contains(&VendorId::Opencode));
+        assert_eq!(
+            c.opencode.db_path.as_deref(),
+            Some(std::path::Path::new("/tmp/oc.db"))
+        );
+        assert_eq!(c.opencode.provider, "opencode");
+        assert_eq!(c.opencode.limit_5h, 20.0);
+        assert_eq!(c.opencode.limit_week, 50.0);
+        assert_eq!(c.opencode.limit_month, 100.0);
     }
 
     #[test]
