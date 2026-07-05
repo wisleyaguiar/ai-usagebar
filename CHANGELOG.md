@@ -9,6 +9,21 @@ Each release is also published at
 
 ## [Unreleased]
 
+### Added
+
+- **Config-driven multiple Anthropic accounts** (#14). Declare extra
+  subscriptions once under `[[anthropic.accounts]]` (`label` +
+  `credentials_path`) and select one on the CLI with `--account <label>`,
+  instead of repeating `--creds-path`/`--cache-dir` on every widget module.
+  Each named account gets an isolated cache at
+  `~/.cache/ai-usagebar/anthropic/<label>/`. Anthropic-only; `--account`
+  conflicts with `--creds-path`. Fully back-compatible: the singular
+  `[anthropic] credentials_path` stays the default account, `--vendor
+  anthropic` with no `--account` is byte-identical to before, and configs
+  with zero or one account keep the unchanged `~/.cache/ai-usagebar/anthropic/`
+  cache path (no migration). Per-account TUI tabs remain a follow-up.
+  (thanks @zanlucathiago)
+
 ### Fixed
 
 - **macOS: the Keychain fallback now also rescues a stale
