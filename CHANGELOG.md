@@ -9,7 +9,22 @@ Each release is also published at
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **macOS: the Keychain fallback now also rescues a stale
+  `~/.claude/.credentials.json`** (#15). Previously the Keychain was only
+  consulted when the file was *missing*, so a leftover zeroed file (no
+  access token, no refresh token, no expiry — e.g. from a pre-Keychain
+  Claude Code install) shadowed valid Keychain credentials forever and
+  Anthropic refresh failed with a stale cache. The default location now
+  falls back to the Keychain when the file is missing **or** clearly
+  unusable, and token refreshes are written back to whichever source was
+  actually read. The predicate is deliberately narrow: a file with a live
+  access token but empty refresh token (the trusted-device shape handled
+  in v0.7.2) stays authoritative. Explicit paths (`--creds-path`, config
+  `credentials_path`, and named accounts) are now read **strictly** — they
+  never consult the Keychain, so a typo'd path fails loudly instead of
+  silently showing a different account's usage. (thanks @igorsdm)
 
 ## [0.9.0] — 2026-07-04
 

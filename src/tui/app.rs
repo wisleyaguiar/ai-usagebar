@@ -137,15 +137,18 @@ async fn build_outcome(
     match vendor {
         VendorId::Anthropic => {
             let cache = crate::cache::Cache::for_vendor("anthropic")?;
-            let creds_path = config
-                .anthropic
-                .credentials_path
-                .clone()
-                .unwrap_or_else(|| crate::anthropic::creds::default_path().unwrap_or_default());
+            // Config credentials_path is an explicit choice (strict read);
+            // only the platform default gets the macOS Keychain fallback.
+            let creds_target = match config.anthropic.credentials_path.clone() {
+                Some(p) => crate::anthropic::creds::CredsTarget::Explicit(p),
+                None => crate::anthropic::creds::CredsTarget::Default(
+                    crate::anthropic::creds::default_path().unwrap_or_default(),
+                ),
+            };
             let endpoints = crate::anthropic::fetch::Endpoints::default();
             let outcome = crate::anthropic::fetch_snapshot(
                 client,
-                &creds_path,
+                &creds_target,
                 &cache,
                 &endpoints,
                 DEFAULT_TTL,

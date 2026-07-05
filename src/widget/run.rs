@@ -245,30 +245,28 @@ async fn deepseek_output(cli: &Cli, config: &Config) -> Result<WaybarOutput> {
 async fn anthropic_output(cli: &Cli, config: &Config) -> Result<WaybarOutput> {
     let client = http_client()?;
     let cache = vendor_cache(cli, "anthropic")?;
-    let creds_path = match cli.creds_path.as_deref() {
-        Some(p) => p.to_path_buf(),
+    // --creds-path and config credentials_path are explicit user choices —
+    // honored strictly. Only the platform-default location is eligible for
+    // the macOS Keychain fallback (see creds::CredsTarget).
+    let creds_target = match cli.creds_path.as_deref() {
+        Some(p) => anthropic::creds::CredsTarget::Explicit(p.to_path_buf()),
         None => match config.anthropic.credentials_path.as_deref() {
-            Some(p) => p.to_path_buf(),
-            None => anthropic::creds::default_path()?,
+            Some(p) => anthropic::creds::CredsTarget::Explicit(p.to_path_buf()),
+            None => anthropic::creds::CredsTarget::Default(anthropic::creds::default_path()?),
         },
     };
     let endpoints = anthropic::fetch::Endpoints::default();
-    let outcome = match anthropic::fetch_snapshot(
-        &client,
-        &creds_path,
-        &cache,
-        &endpoints,
-        DEFAULT_TTL,
-    )
-    .await
-    {
-        Ok(o) => o,
-        Err(e) if e.is_transient() => {
-            // Mirror claudebar's `loading_network` path.
-            return Ok(WaybarOutput::loading(cli.icon.as_deref()));
-        }
-        Err(e) => return Err(e),
-    };
+    let outcome =
+        match anthropic::fetch_snapshot(&client, &creds_target, &cache, &endpoints, DEFAULT_TTL)
+            .await
+        {
+            Ok(o) => o,
+            Err(e) if e.is_transient() => {
+                // Mirror claudebar's `loading_network` path.
+                return Ok(WaybarOutput::loading(cli.icon.as_deref()));
+            }
+            Err(e) => return Err(e),
+        };
 
     let theme = theme_from_cli(cli);
 
