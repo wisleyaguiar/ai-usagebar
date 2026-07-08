@@ -9,6 +9,10 @@ Each release is also published at
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.12.0] — 2026-07-08
+
 ### Added
 
 - **Model-scoped weekly limits (e.g. the Fable weekly cap)** now render in the
@@ -493,7 +497,8 @@ vendors. Highlights:
 - Live API smoke test suite (`make smoke`) that exercises the real
   undocumented endpoints to detect schema drift before users do.
 
-[Unreleased]: https://github.com/akitaonrails/ai-usagebar/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/akitaonrails/ai-usagebar/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.12.0
 [0.11.0]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.11.0
 [0.10.0]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.10.0
 [0.9.0]: https://github.com/akitaonrails/ai-usagebar/releases/tag/v0.9.0
