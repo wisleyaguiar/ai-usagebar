@@ -235,3 +235,33 @@ async fn openrouter_live() {
         out.snapshot.is_free_tier,
     );
 }
+
+/// Live probe of a locally running Antigravity IDE / agy. No credentials —
+/// requires the IDE (or the agy CLI) to be running on this machine. Run with:
+/// `cargo test --test live antigravity -- --ignored --nocapture`
+#[tokio::test]
+#[ignore]
+async fn antigravity_live_probe() {
+    let endpoints = ai_usagebar::antigravity::discover_endpoints().await;
+    assert!(
+        !endpoints.is_empty(),
+        "no Antigravity language server found — open the IDE first"
+    );
+    let td = tempfile::TempDir::new().unwrap();
+    let cache = Cache::at(td.path().join("antigravity"));
+    let client = ai_usagebar::antigravity::loopback_client().unwrap();
+    let out = ai_usagebar::antigravity::fetch_snapshot(
+        &client,
+        &endpoints,
+        &cache,
+        Duration::from_secs(0),
+    )
+    .await
+    .expect("antigravity fetch should succeed against the live language server");
+
+    println!("✅ antigravity — snapshot: {:#?}", out.snapshot);
+    assert!(
+        out.snapshot.gemini_session.is_some() || out.snapshot.claude_gpt_session.is_some(),
+        "expected at least one quota bucket from the live server"
+    );
+}

@@ -236,17 +236,29 @@ pub async fn fetch_snapshot(
     fallback_with_error(cache, err)
 }
 
+/// Strip the Connect-RPC `{"response": {...}}` envelope when present; some
+/// server builds return the body bare.
+fn unwrap_envelope(bytes: &[u8]) -> serde_json::Result<serde_json::Value> {
+    let v: serde_json::Value = serde_json::from_slice(bytes)?;
+    Ok(match v.get("response") {
+        Some(inner) if inner.is_object() => inner.clone(),
+        _ => v,
+    })
+}
+
 /// One endpoint: try the preferred quota summary, then the legacy status.
 async fn fetch_live(client: &reqwest::Client, ep: &Endpoint) -> Result<AntigravitySnapshot> {
     match post_json(client, ep, "RetrieveUserQuotaSummary").await {
         Ok(bytes) => {
-            let resp: QuotaSummaryResponse = serde_json::from_slice(&bytes)
+            let resp: QuotaSummaryResponse = unwrap_envelope(&bytes)
+                .and_then(serde_json::from_value)
                 .map_err(|e| AppError::Schema(format!("antigravity quota summary: {e}")))?;
             Ok(resp.into_snapshot())
         }
         Err(_) => {
             let bytes = post_json(client, ep, "GetUserStatus").await?;
-            let resp: UserStatusResponse = serde_json::from_slice(&bytes)
+            let resp: UserStatusResponse = unwrap_envelope(&bytes)
+                .and_then(serde_json::from_value)
                 .map_err(|e| AppError::Schema(format!("antigravity user status: {e}")))?;
             Ok(resp.into_snapshot())
         }
@@ -382,20 +394,22 @@ language_ 40001   me   27u  IPv4 0x0        0t0  TCP 127.0.0.1:42100 (LISTEN)
         (td, cache)
     }
 
-    const SUMMARY_BODY: &str = r#"{"groups":[
+    // Wire-faithful body: {"response": …} envelope, fraction directly on the
+    // bucket, explicit "window" discriminator (captured from a live server).
+    const SUMMARY_BODY: &str = r#"{"response":{"groups":[
         {"displayName":"Gemini Models","buckets":[
-            {"bucketId":"gemini-5h","displayName":"5-hour limit",
-             "remaining":{"remainingFraction":0.37}},
-            {"bucketId":"gemini-weekly","displayName":"Weekly limit",
-             "remaining":{"remainingFraction":0.72}}
+            {"bucketId":"gemini-5h","displayName":"Five Hour Limit",
+             "window":"5h","remainingFraction":0.37},
+            {"bucketId":"gemini-weekly","displayName":"Weekly Limit",
+             "window":"weekly","remainingFraction":0.72}
         ]},
         {"displayName":"Claude and GPT models","buckets":[
-            {"bucketId":"cg-5h","displayName":"5-hour limit",
-             "remaining":{"remainingFraction":0.10}},
-            {"bucketId":"cg-weekly","displayName":"Weekly limit",
-             "remaining":{"remainingFraction":0.55}}
+            {"bucketId":"3p-5h","displayName":"Five Hour Limit",
+             "window":"5h","remainingFraction":0.10},
+            {"bucketId":"3p-weekly","displayName":"Weekly Limit",
+             "window":"weekly","remainingFraction":0.55}
         ]}
-    ]}"#;
+    ]}}"#;
 
     #[tokio::test]
     async fn live_200_parses_summary_and_sends_headers() {

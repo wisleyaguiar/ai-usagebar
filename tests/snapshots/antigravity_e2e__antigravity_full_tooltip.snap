@@ -1,0 +1,27 @@
+---
+source: tests/antigravity_e2e.rs
+expression: "normalize_updated_time(&out.tooltip, now(), cache_age)"
+---
+<span foreground='#61afef'>╭─────────────────────────────╮</span>
+<span foreground='#61afef'>│</span>         <span font_weight='bold' foreground='#61afef'>Antigravity</span>         <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>───────────────────────────</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#abb2bf'>  󰔟  Gemini 5h</span>              <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#e5c07b'>████████████</span><span foreground='#3e4451'>░░░░░░░░</span>  <span font_weight='bold' foreground='#e5c07b'>63%</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>  ⏱  Resets in 2h 30m</span>       <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#abb2bf'>  󰃰  Gemini weekly</span>          <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#98c379'>█████</span><span foreground='#3e4451'>░░░░░░░░░░░░░░░</span>  <span font_weight='bold' foreground='#98c379'>28%</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>  ⏱  Resets in 3d 12h</span>       <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#abb2bf'>  󰔟  Claude+GPT 5h</span>          <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#e06c75'>██████████████████</span><span foreground='#3e4451'>░░</span>  <span font_weight='bold' foreground='#e06c75'>90%</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>  ⏱  Resets in 2h 30m</span>       <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#abb2bf'>  󰃰  Claude+GPT weekly</span>      <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>   <span foreground='#98c379'>█████████</span><span foreground='#3e4451'>░░░░░░░░░░░</span>  <span font_weight='bold' foreground='#98c379'>45%</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>  ⏱  Resets in 3d 12h</span>       <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span>                             <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>───────────────────────────</span> <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>│</span> <span foreground='#5c6370'>  󰅐  Updated HH:MM</span>          <span foreground='#61afef'>│</span>
+<span foreground='#61afef'>╰─────────────────────────────╯</span>

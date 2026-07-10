@@ -12,8 +12,10 @@ use serde::Deserialize;
 use crate::error::Result;
 use crate::usage::{AntigravitySnapshot, UsageWindow};
 
-/// `RetrieveUserQuotaSummary` response.
-#[derive(Debug, Clone, Deserialize)]
+/// `RetrieveUserQuotaSummary` response body. On the wire it arrives wrapped
+/// in a `{"response": {...}}` envelope (Connect-RPC style) — the fetch layer
+/// unwraps that before deserializing into this.
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuotaSummaryResponse {
     #[serde(default)]
@@ -36,11 +38,24 @@ pub struct QuotaBucket {
     pub bucket_id: String,
     #[serde(default)]
     pub display_name: String,
+    /// Live servers put the fraction directly on the bucket…
+    pub remaining_fraction: Option<f64>,
+    /// …older/other shapes nest it under `remaining`.
     pub remaining: Option<RemainingQuota>,
+    /// Explicit window discriminator on live servers: "weekly" | "5h".
+    #[serde(default)]
+    pub window: String,
     /// ISO-8601 string or epoch seconds — shape varies, parsed leniently.
     pub reset_time: Option<serde_json::Value>,
     #[serde(default)]
     pub description: String,
+}
+
+impl QuotaBucket {
+    fn fraction(&self) -> Option<f64> {
+        self.remaining_fraction
+            .or_else(|| self.remaining.as_ref().and_then(|r| r.remaining_fraction))
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -103,8 +118,14 @@ fn classify_group(name: &str) -> Option<ModelGroup> {
     }
 }
 
-/// Weekly vs 5h window, inferred from bucket id + display name.
+/// Weekly vs 5h window. Live servers carry an explicit `window` field;
+/// fall back to a bucket-id/display-name heuristic when it's absent.
 fn is_weekly(bucket: &QuotaBucket) -> bool {
+    match bucket.window.as_str() {
+        "weekly" => return true,
+        "5h" => return false,
+        _ => {}
+    }
     let hay = format!("{} {}", bucket.bucket_id, bucket.display_name).to_lowercase();
     hay.contains("week") || hay.contains("7d")
 }
@@ -153,8 +174,7 @@ impl QuotaSummaryResponse {
                 continue;
             };
             for bucket in &group.buckets {
-                let Some(frac) = bucket.remaining.as_ref().and_then(|r| r.remaining_fraction)
-                else {
+                let Some(frac) = bucket.fraction() else {
                     continue;
                 };
                 let reset = bucket
@@ -279,22 +299,28 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
 
+    // Mirrors the live wire shape (inner body, after the fetch layer strips
+    // the {"response": …} envelope): fraction directly on the bucket plus an
+    // explicit "window" discriminator. Weekly listed first, like the real
+    // server, to prove ordering doesn't matter.
     const SUMMARY_FIXTURE: &str = r#"{
         "groups": [
-            {"displayName": "Gemini Models", "buckets": [
-                {"bucketId": "gemini-5h", "displayName": "5-hour limit",
-                 "remaining": {"remainingFraction": 0.37},
-                 "resetTime": "2026-07-01T14:30:00Z"},
-                {"bucketId": "gemini-weekly", "displayName": "Weekly limit",
-                 "remaining": {"remainingFraction": 0.72},
-                 "resetTime": "2026-07-05T00:00:00Z"}
+            {"displayName": "Gemini Models",
+             "description": "Models within this group: Gemini Flash, Gemini Pro",
+             "buckets": [
+                {"bucketId": "gemini-weekly", "displayName": "Weekly Limit",
+                 "window": "weekly", "remainingFraction": 0.72,
+                 "resetTime": "2026-07-05T00:00:00Z"},
+                {"bucketId": "gemini-5h", "displayName": "Five Hour Limit",
+                 "window": "5h", "remainingFraction": 0.37,
+                 "resetTime": "2026-07-01T14:30:00Z"}
             ]},
             {"displayName": "Claude and GPT models", "buckets": [
-                {"bucketId": "claude-gpt-5h", "displayName": "5-hour limit",
-                 "remaining": {"remainingFraction": 0.10},
+                {"bucketId": "3p-5h", "displayName": "Five Hour Limit",
+                 "window": "5h", "remainingFraction": 0.10,
                  "resetTime": "2026-07-01T14:30:00Z"},
-                {"bucketId": "claude-gpt-weekly", "displayName": "Weekly limit",
-                 "remaining": {"remainingFraction": 0.55}}
+                {"bucketId": "3p-weekly", "displayName": "Weekly Limit",
+                 "window": "weekly", "remainingFraction": 0.55}
             ]}
         ]
     }"#;
@@ -319,6 +345,25 @@ mod tests {
             snap.gemini_session.as_ref().unwrap().window_duration,
             chrono::Duration::hours(5)
         );
+        assert_eq!(
+            snap.gemini_weekly.as_ref().unwrap().window_duration,
+            chrono::Duration::days(7)
+        );
+    }
+
+    #[test]
+    fn nested_remaining_shape_still_parses() {
+        // Compatibility with the alternate shape that nests the fraction
+        // under `remaining` and omits `window` (heuristic kicks in).
+        let json = r#"{"groups": [
+            {"displayName": "Gemini Models", "buckets": [
+                {"bucketId": "gemini-weekly", "displayName": "Weekly limit",
+                 "remaining": {"remainingFraction": 0.75}}
+            ]}
+        ]}"#;
+        let resp: QuotaSummaryResponse = serde_json::from_str(json).unwrap();
+        let snap = resp.into_snapshot();
+        assert_eq!(snap.gemini_weekly.as_ref().unwrap().utilization_pct, 25);
         assert_eq!(
             snap.gemini_weekly.as_ref().unwrap().window_duration,
             chrono::Duration::days(7)
