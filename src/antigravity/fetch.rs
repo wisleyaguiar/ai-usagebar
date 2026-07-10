@@ -484,14 +484,13 @@ language_ 40001   me   27u  IPv4 0x0        0t0  TCP 127.0.0.1:42100 (LISTEN)
     #[tokio::test]
     async fn no_endpoints_serves_stale_cache_with_error() {
         let (_td, cache) = cache_fixture();
-        let seed = super::super::types::snap_to_json(&{
-            let mut s = AntigravitySnapshot::default();
-            s.gemini_session = Some(crate::usage::UsageWindow {
+        let seed = super::super::types::snap_to_json(&AntigravitySnapshot {
+            gemini_session: Some(crate::usage::UsageWindow {
                 utilization_pct: 42,
                 resets_at: None,
                 window_duration: chrono::Duration::hours(5),
-            });
-            s
+            }),
+            ..Default::default()
         });
         cache.write_payload(seed.to_string().as_bytes()).unwrap();
 

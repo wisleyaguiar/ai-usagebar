@@ -8,7 +8,7 @@
 [ui]
 # Which vendor the widget shows when `--vendor` is omitted, AND which tab
 # is selected when the TUI opens. Comment out to default to Anthropic.
-# Valid: anthropic | openai | zai | openrouter | deepseek | opencode
+# Valid: anthropic | openai | zai | openrouter | deepseek | opencode | antigravity
 # primary = "anthropic"
 
 [anthropic]
@@ -61,3 +61,10 @@ provider = "opencode-go"
 limit_5h = 12.0
 limit_week = 30.0
 limit_month = 60.0
+
+[antigravity]
+# Google Antigravity IDE quota tracking. No credentials — probes the IDE's
+# local language server (loopback HTTPS), so the IDE (or the agy CLI) must
+# be running for fresh data; otherwise the last cached snapshot is shown.
+# Buckets: Gemini 5h/weekly + Claude+GPT 5h/weekly.
+enabled = false

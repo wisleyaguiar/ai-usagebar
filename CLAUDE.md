@@ -121,7 +121,7 @@ OpenAI Codex OAuth, Z.AI monitor). If the smoke test fails after a
 vendor's response shape drifts:
 
 1. Capture the actual response (`curl -sH "Authorization: …" …`).
-2. Update the matching `types.rs` in `src/{anthropic,openai,zai,openrouter,deepseek}/`.
+2. Update the matching `types.rs` in `src/{anthropic,openai,zai,openrouter,deepseek,antigravity}/`.
 3. Re-run `make smoke` until green.
 4. **Bump pkgrel (not pkgver) in both PKGBUILDs** — the user-visible
    functionality is unchanged; it's a packaging update tracking a
@@ -132,6 +132,10 @@ vendor's response shape drifts:
 - `src/active.rs` — scroll-cycle active vendor state file
 - `src/anthropic/`, `src/openai/`, `src/openrouter/`, `src/zai/`,
   `src/deepseek/` — per-vendor types + fetch + render
+- `src/antigravity/` — Antigravity vendor: probes the IDE's local language
+  server (loopback HTTPS + CSRF token from the process args). The reqwest
+  client with `danger_accept_invalid_certs` lives ONLY here
+  (`fetch::loopback_client`) and must never touch remote hosts.
 - `src/anthropic/keychain.rs` — macOS-only `security(1)` fallback when
   `~/.claude/.credentials.json` is absent (Claude Code on macOS stores
   the OAuth blob in the login Keychain). Module-gated with
