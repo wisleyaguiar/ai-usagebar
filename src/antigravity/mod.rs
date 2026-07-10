@@ -6,5 +6,6 @@
 
 pub mod fetch;
 pub mod types;
+pub mod vendor;
 
 pub use fetch::{Endpoint, FetchOutcome, discover_endpoints, fetch_snapshot, loopback_client};
