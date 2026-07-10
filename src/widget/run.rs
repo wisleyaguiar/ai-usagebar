@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::deepseek;
 use crate::error::{AppError, Result};
 use crate::openai;
+use crate::antigravity;
 use crate::opencode;
 use crate::openrouter;
 use crate::theme::Theme;
@@ -110,7 +111,35 @@ async fn build_output(cli: &Cli) -> Result<WaybarOutput> {
         Vendor::Zai => zai_output(cli, &config).await,
         Vendor::Deepseek => deepseek_output(cli, &config).await,
         Vendor::Opencode => opencode_output(cli, &config).await,
+        Vendor::Antigravity => antigravity_output(cli).await,
     }
+}
+
+/// Local-first vendor: probes the Antigravity IDE's language server on
+/// loopback. Uses the dedicated self-signed-tolerant client, never the
+/// shared one.
+async fn antigravity_output(cli: &Cli) -> Result<WaybarOutput> {
+    let cache = vendor_cache(cli, "antigravity")?;
+    let client = antigravity::loopback_client()?;
+    let endpoints = antigravity::discover_endpoints().await;
+    let outcome =
+        match antigravity::fetch_snapshot(&client, &endpoints, &cache, DEFAULT_TTL).await {
+            Ok(o) => o,
+            Err(e) if e.is_transient() => return Ok(WaybarOutput::loading(cli.icon.as_deref())),
+            Err(e) => return Err(e),
+        };
+
+    let theme = theme_from_cli(cli);
+    let snap = outcome.snapshot.clone();
+    let vendor_outcome: VendorOutcome = outcome.into();
+    let opts = RenderOpts::from_cli(cli);
+    Ok(antigravity::vendor::render(
+        &vendor_outcome,
+        &snap,
+        &theme,
+        &opts,
+        Utc::now(),
+    ))
 }
 
 /// Local-first vendor: no HTTP client, no API key — reads the opencode CLI's

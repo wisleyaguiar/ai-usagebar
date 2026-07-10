@@ -116,6 +116,7 @@ pub enum Vendor {
     Openrouter,
     Deepseek,
     Opencode,
+    Antigravity,
 }
 
 impl Vendor {
@@ -127,6 +128,7 @@ impl Vendor {
             Vendor::Openrouter => crate::vendor::VendorId::Openrouter,
             Vendor::Deepseek => crate::vendor::VendorId::Deepseek,
             Vendor::Opencode => crate::vendor::VendorId::Opencode,
+            Vendor::Antigravity => crate::vendor::VendorId::Antigravity,
         }
     }
 }
@@ -188,6 +190,7 @@ fn id_to_vendor(id: crate::vendor::VendorId) -> Vendor {
         crate::vendor::VendorId::Openrouter => Vendor::Openrouter,
         crate::vendor::VendorId::Deepseek => Vendor::Deepseek,
         crate::vendor::VendorId::Opencode => Vendor::Opencode,
+        crate::vendor::VendorId::Antigravity => Vendor::Antigravity,
     }
 }
 

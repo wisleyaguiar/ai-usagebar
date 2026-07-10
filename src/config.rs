@@ -29,6 +29,7 @@ pub struct Config {
     pub openrouter: OpenRouterConfig,
     pub deepseek: DeepseekConfig,
     pub opencode: OpencodeConfig,
+    pub antigravity: AntigravityConfig,
 }
 
 /// UI / dispatch preferences. Currently just `primary` — which vendor the
@@ -171,6 +172,15 @@ impl Default for OpencodeConfig {
     }
 }
 
+/// Google Antigravity IDE — no credentials/API key; probes the IDE's local
+/// language server, which must be running for fresh data. Quota fractions
+/// come straight from the server, so there are no limits to configure.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct AntigravityConfig {
+    pub enabled: bool,
+}
+
 /// Resolve an API key for a vendor: env var wins, then inline config, then
 /// a clear error naming both fields. Used by Z.AI and OpenRouter vendors.
 pub fn resolve_api_key(
@@ -223,6 +233,7 @@ impl Config {
             VendorId::Openrouter => self.openrouter.enabled,
             VendorId::Deepseek => self.deepseek.enabled,
             VendorId::Opencode => self.opencode.enabled,
+            VendorId::Antigravity => self.antigravity.enabled,
         }
     }
 
@@ -433,6 +444,15 @@ enabled = false
                 VendorId::Openrouter,
             ]
         );
+    }
+
+    #[test]
+    fn antigravity_defaults_off_and_parses_enable() {
+        let c = Config::default();
+        assert!(!c.is_enabled(VendorId::Antigravity));
+        let c: Config = toml::from_str("[antigravity]\nenabled = true\n").unwrap();
+        assert!(c.is_enabled(VendorId::Antigravity));
+        assert!(c.enabled_vendors().contains(&VendorId::Antigravity));
     }
 
     #[test]

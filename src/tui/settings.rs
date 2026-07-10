@@ -563,6 +563,7 @@ fn vendor_label(v: VendorId) -> &'static str {
         VendorId::Openrouter => "OpenRouter",
         VendorId::Deepseek => "DeepSeek",
         VendorId::Opencode => "OpenCode",
+        VendorId::Antigravity => "Antigravity",
     }
 }
 
