@@ -83,6 +83,7 @@ pub fn sections_for(tab: &TabState, now: DateTime<Utc>, pace_tolerance: u32) -> 
                 VendorSnapshot::Openrouter(s) => openrouter_sections(s),
                 VendorSnapshot::Deepseek(s) => deepseek_sections(s),
                 VendorSnapshot::Opencode(s) => opencode_sections(s),
+                VendorSnapshot::Antigravity(s) => antigravity_sections(s, now, pace_tolerance),
             };
             // Inject the (already-absolute) fetched-at instant into the title
             // row, right-aligned. Pre-snapshotted in app::refresh_one so it
@@ -309,6 +310,41 @@ fn opencode_sections(s: &crate::usage::OpencodeSnapshot) -> Vec<Section> {
             s.top_model.as_deref().unwrap_or("—")
         )],
     });
+    v
+}
+
+fn antigravity_sections(
+    s: &crate::usage::AntigravitySnapshot,
+    now: DateTime<Utc>,
+    tol: u32,
+) -> Vec<Section> {
+    let mut v = vec![Section::Title {
+        left: "Antigravity".into(),
+        right: None,
+    }];
+    if let Some(w) = &s.gemini_session {
+        push_window(&mut v, "Gemini 5h", w, now, tol, true);
+    }
+    if let Some(w) = &s.gemini_weekly {
+        push_window(&mut v, "Gemini weekly", w, now, tol, true);
+    }
+    if let Some(w) = &s.claude_gpt_session {
+        push_window(&mut v, "Claude+GPT 5h", w, now, tol, true);
+    }
+    if let Some(w) = &s.claude_gpt_weekly {
+        push_window(&mut v, "Claude+GPT weekly", w, now, tol, true);
+    }
+    if s.gemini_session.is_none()
+        && s.gemini_weekly.is_none()
+        && s.claude_gpt_session.is_none()
+        && s.claude_gpt_weekly.is_none()
+    {
+        v.push(Section::Spacer);
+        v.push(Section::Text {
+            label: "".into(),
+            value: "no quota buckets reported".into(),
+        });
+    }
     v
 }
 
@@ -733,6 +769,43 @@ mod tests {
             s,
             Section::Block { body, .. }
                 if body.iter().any(|b| b.contains("deepseek-v4-pro"))
+        )));
+    }
+
+    #[test]
+    fn antigravity_sections_render_all_four_buckets() {
+        let w = |pct: i32| crate::usage::UsageWindow {
+            utilization_pct: pct,
+            resets_at: None,
+            window_duration: chrono::Duration::hours(5),
+        };
+        let snap = crate::usage::AntigravitySnapshot {
+            gemini_session: Some(w(63)),
+            gemini_weekly: Some(w(28)),
+            claude_gpt_session: Some(w(90)),
+            claude_gpt_weekly: Some(w(45)),
+        };
+        let sections = sections_for(&ready(VendorSnapshot::Antigravity(snap)), now(), 5);
+        assert!(matches!(sections[0], Section::Title { .. }));
+        let metrics = sections
+            .iter()
+            .filter(|s| matches!(s, Section::Metric { .. }))
+            .count();
+        assert_eq!(metrics, 4);
+    }
+
+    #[test]
+    fn antigravity_empty_snapshot_renders_message() {
+        let sections = sections_for(
+            &ready(VendorSnapshot::Antigravity(
+                crate::usage::AntigravitySnapshot::default(),
+            )),
+            now(),
+            5,
+        );
+        assert!(sections.iter().any(|s| matches!(
+            s,
+            Section::Text { value, .. } if value.contains("no quota buckets reported")
         )));
     }
 
