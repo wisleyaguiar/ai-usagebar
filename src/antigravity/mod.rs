@@ -4,4 +4,7 @@
 //! port come from the running process itself. When the IDE isn't running,
 //! the cached snapshot is served (marked stale).
 
+pub mod fetch;
 pub mod types;
+
+pub use fetch::{Endpoint, FetchOutcome, discover_endpoints, fetch_snapshot, loopback_client};
