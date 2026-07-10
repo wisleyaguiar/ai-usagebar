@@ -9,6 +9,7 @@
 //! CLI args, instantiate vendors, and hand off to a renderer in this crate.
 
 pub mod active;
+pub mod antigravity;
 pub mod anthropic;
 pub mod cache;
 pub mod config;
