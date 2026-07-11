@@ -171,6 +171,38 @@ impl OpencodeSnapshot {
     }
 }
 
+/// Google Antigravity IDE — four quota buckets probed from the IDE's local
+/// language server (`RetrieveUserQuotaSummary`). Two model groups × two
+/// windows; every bucket is optional because the server may omit a group
+/// (e.g. a plan without Claude/GPT access).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AntigravitySnapshot {
+    /// "Gemini Models" group, 5-hour window.
+    pub gemini_session: Option<UsageWindow>,
+    /// "Gemini Models" group, weekly window.
+    pub gemini_weekly: Option<UsageWindow>,
+    /// "Claude and GPT models" group, 5-hour window.
+    pub claude_gpt_session: Option<UsageWindow>,
+    /// "Claude and GPT models" group, weekly window.
+    pub claude_gpt_weekly: Option<UsageWindow>,
+}
+
+impl AntigravitySnapshot {
+    /// Worst-of percentage across all present buckets — drives severity.
+    pub fn max_pct(&self) -> i32 {
+        [
+            &self.gemini_session,
+            &self.gemini_weekly,
+            &self.claude_gpt_session,
+            &self.claude_gpt_weekly,
+        ]
+        .into_iter()
+        .filter_map(|w| w.as_ref().map(|w| w.utilization_pct))
+        .max()
+        .unwrap_or(0)
+    }
+}
+
 /// Discriminated union of vendor-specific snapshots. The widget and TUI match
 /// on this to pick a renderer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -181,6 +213,7 @@ pub enum VendorSnapshot {
     Openrouter(OpenRouterSnapshot),
     Deepseek(DeepseekSnapshot),
     Opencode(OpencodeSnapshot),
+    Antigravity(AntigravitySnapshot),
 }
 
 /// OpenAI Codex OAuth — mirrors Anthropic's two-window + extras pattern.
@@ -428,5 +461,29 @@ mod tests {
         // session = 100, weekly = 50, extra = 100% → max should be 100.
         let s = snap(100, 50, None, Some((10000, 10000)));
         assert_eq!(anthropic_severity(&s), PaceSeverity::Critical);
+    }
+
+    fn ag_w(pct: i32) -> UsageWindow {
+        UsageWindow {
+            utilization_pct: pct,
+            resets_at: None,
+            window_duration: Duration::hours(5),
+        }
+    }
+
+    #[test]
+    fn antigravity_max_pct_picks_worst_bucket() {
+        let snap = AntigravitySnapshot {
+            gemini_session: Some(ag_w(10)),
+            gemini_weekly: Some(ag_w(80)),
+            claude_gpt_session: Some(ag_w(45)),
+            claude_gpt_weekly: None,
+        };
+        assert_eq!(snap.max_pct(), 80);
+    }
+
+    #[test]
+    fn antigravity_max_pct_empty_is_zero() {
+        assert_eq!(AntigravitySnapshot::default().max_pct(), 0);
     }
 }

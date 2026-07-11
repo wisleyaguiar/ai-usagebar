@@ -240,6 +240,15 @@ async fn build_outcome(
             .await?;
             Ok(outcome.into())
         }
+        VendorId::Antigravity => {
+            let cache = crate::cache::Cache::for_vendor("antigravity")?;
+            let lb_client = crate::antigravity::loopback_client()?;
+            let endpoints = crate::antigravity::discover_endpoints().await;
+            let outcome =
+                crate::antigravity::fetch_snapshot(&lb_client, &endpoints, &cache, DEFAULT_TTL)
+                    .await?;
+            Ok(outcome.into())
+        }
     }
 }
 

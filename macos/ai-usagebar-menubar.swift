@@ -193,6 +193,9 @@ let VENDOR_AUTH: [VendorAuth] = [
     // SQLite DB. Configured ⇔ that DB exists (plus [opencode] enabled=true
     // in the ai-usagebar config, editable via the TUI/config file).
     VendorAuth(id: "opencode", name: "OpenCode Go", kind: "local", cli: "opencode", login: "", pkg: "", env: ""),
+    // "local" = no credentials; quota is probed from the Antigravity IDE's
+    // local language server. Configured ⇔ the IDE (or its CLI dir) exists.
+    VendorAuth(id: "antigravity", name: "Antigravity (Google)", kind: "local", cli: "agy", login: "", pkg: "", env: ""),
 ]
 
 func configHasApiKeyTOML(_ section: String) -> Bool {
@@ -231,6 +234,11 @@ func vendorConfigured(_ v: VendorAuth) -> Bool {
     }
     if v.id == "opencode" {
         return fm.fileExists(atPath: "\(home)/.local/share/opencode/opencode.db")
+    }
+    if v.id == "antigravity" {
+        return fm.fileExists(atPath: "/Applications/Antigravity IDE.app")
+            || fm.fileExists(atPath: "/Applications/Antigravity.app")
+            || fm.fileExists(atPath: "\(home)/.antigravity")
     }
     if let e = ProcessInfo.processInfo.environment[v.env], !e.isEmpty { return true }
     return configHasApiKeyTOML(v.id)
@@ -376,7 +384,7 @@ struct SettingsView: View {
     @AppStorage("colorEmpty") private var colorEmpty = "#3e4451"
     @AppStorage("binaryPath") private var binaryPath = ""
 
-    private let vendors = ["anthropic", "openai", "zai", "openrouter", "deepseek", "opencode"]
+    private let vendors = ["anthropic", "openai", "zai", "openrouter", "deepseek", "opencode", "antigravity"]
 
     var body: some View {
         Form {
@@ -554,9 +562,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if SHOW_SESSION { seg("5h", s.session.pct, "\(s.session.pct)%") }
         if SHOW_WEEKLY { seg("7d", s.weekly.pct, "\(s.weekly.pct)%") }
-        // For OpenCode Go the money bucket is the monthly window, not
-        // Anthropic-style pay-as-you-go extra usage.
-        if SHOW_EXTRA, let e = s.extra { seg(VENDOR == "opencode" ? "mo" : "ex", e.pct, e.spent) }
+        // For OpenCode Go the money bucket is the monthly window, and for
+        // Antigravity it's the Claude+GPT 5h bucket — not Anthropic-style
+        // pay-as-you-go extra usage.
+        if SHOW_EXTRA, let e = s.extra {
+            let tag = VENDOR == "opencode" ? "mo" : (VENDOR == "antigravity" ? "cg" : "ex")
+            seg(tag, e.pct, e.spent)
+        }
         statusItem.button?.attributedTitle = title.length > 0 ? title : run("ai", .secondaryLabelColor)
     }
 
@@ -576,9 +588,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         row("session", "Session", s.session.pct, "\(s.session.pct)%", s.session.reset)
         row("weekly", "Weekly", s.weekly.pct, "\(s.weekly.pct)%", s.weekly.reset)
-        if let sn = s.sonnet { row("sonnet", "Sonnet only", sn.pct, "\(sn.pct)%", sn.reset) }
+        if let sn = s.sonnet {
+            let label = VENDOR == "antigravity" ? "Claude+GPT" : "Sonnet only"
+            row("sonnet", label, sn.pct, "\(sn.pct)%", sn.reset)
+        }
         else { rows["sonnet"]?.isHidden = true }
-        if let e = s.extra {
+        // Antigravity's Claude+GPT bucket already occupies the sonnet row;
+        // the extra slot only feeds the compact panel there.
+        if let e = s.extra, VENDOR != "antigravity" {
             let label = VENDOR == "opencode" ? "Monthly" : "Extra usage"
             row("extra", label, e.pct, "\(e.spent) / \(e.limit)", nil)
         } else { rows["extra"]?.isHidden = true }

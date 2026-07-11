@@ -28,6 +28,22 @@ Each release is also published at
   picker, an OpenCode Go row in the Vendors section (configured ⇔ the
   opencode CLI's local DB exists), a "Monthly" dropdown row for the Go
   dollar cap, and rolling windows no longer render a dangling "↺ —" reset.
+- **Google Antigravity vendor** (`--vendor antigravity`) — local-first, no
+  credentials: discovers the Antigravity IDE's language-server process
+  (`ps` + `lsof` + the `--csrf_token` from its own command line) and probes
+  `RetrieveUserQuotaSummary` over loopback HTTPS for the plan's four quota
+  buckets (Gemini and Claude+GPT groups, 5h + weekly windows) — the same
+  numbers as Settings → Models inside the IDE. Includes bar text, bordered
+  tooltip with one bar per bucket, a native TUI panel, `{ag_*}` format
+  placeholders, mockito + insta e2e tests, and an `#[ignore]`d live smoke.
+  Disabled by default; when the IDE isn't running the cached snapshot is
+  served with a stale marker. The Claude+GPT 5h bucket also fills the
+  cross-vendor `{sonnet_*}`/`{extra_*}` aliases so the GNOME extension and
+  the macOS menu bar render a third bar with no vendor-specific wiring.
+- **macOS menu bar app: Antigravity support** — `antigravity` in the vendor
+  picker, an Antigravity row in the Vendors section (configured ⇔ the IDE
+  app bundle or `~/.antigravity` exists), the third dropdown row relabeled
+  "Claude+GPT", and a "cg" tag for the compact panel's third segment.
 
 ## [0.8.0] — 2026-07-01
 

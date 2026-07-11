@@ -1,0 +1,5 @@
+---
+source: tests/antigravity_e2e.rs
+expression: "&out.text"
+---
+<span foreground='#e06c75'>63% · 28%</span>
